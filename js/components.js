@@ -629,13 +629,13 @@ const Components = {
             '<button class="btn btn-secondary" style="margin-top:12px" onclick="App.resetAppData()"><i class="fas fa-trash"></i> Clear all data</button></div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
-            '<form id="createUserForm" class="modern-form" onsubmit="App.handleCreateUser(event)">' +
+            '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
             '<div class="form-row">' +
-            '<div class="form-group half"><label>Name</label><input type="text" id="newUserName" required></div>' +
-            '<div class="form-group half"><label>Email</label><input type="email" id="newUserEmail" required></div>' +
+            '<div class="form-group half"><label>Name</label><input type="text" id="newUserName" name="newUserName" autocomplete="off" autocapitalize="none" spellcheck="false" required></div>' +
+            '<div class="form-group half"><label>Email</label><input type="email" id="newUserEmail" name="newUserEmail" autocomplete="email" required></div>' +
             '</div>' +
             '<div class="form-row">' +
-            '<div class="form-group half"><label>Password</label><input type="password" id="newUserPassword" required></div>' +
+            '<div class="form-group half"><label>Password</label><input type="password" id="newUserPassword" name="newUserPassword" autocomplete="new-password" required></div>' +
             '<div class="form-group half"><label>Role</label><select id="newUserRole"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>' +
             '</div>' +
             '<button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create user</button>' +

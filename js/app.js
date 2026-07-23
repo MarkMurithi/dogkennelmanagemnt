@@ -261,11 +261,16 @@ const App = {
 
     handleCreateUser(event) {
         event.preventDefault();
+        const nameInput = document.getElementById('newUserName');
+        const emailInput = document.getElementById('newUserEmail');
+        const passwordInput = document.getElementById('newUserPassword');
+        const roleInput = document.getElementById('newUserRole');
+
         const payload = {
-            name: document.getElementById('newUserName').value.trim(),
-            email: document.getElementById('newUserEmail').value.trim().toLowerCase(),
-            password: document.getElementById('newUserPassword').value,
-            role: document.getElementById('newUserRole').value,
+            name: nameInput.value.trim(),
+            email: emailInput.value.trim().toLowerCase(),
+            password: passwordInput.value,
+            role: roleInput.value,
             active: true
         };
         if (!payload.name || !payload.email || !payload.password) {
@@ -276,6 +281,10 @@ const App = {
             if (result.ok) {
                 Components.toast('User created successfully');
                 document.getElementById('createUserForm').reset();
+                nameInput.value = '';
+                emailInput.value = '';
+                passwordInput.value = '';
+                roleInput.value = 'staff';
                 this.render();
             } else {
                 Components.toast(result.error || 'Unable to create user', 'error');
