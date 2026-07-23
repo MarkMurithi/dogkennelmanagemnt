@@ -2,6 +2,10 @@
 
 A polished kennel-management web app with dog and puppy management, health and breeding tracking, finance, calendar events, reporting, backup/restore support, and a database-backed backend.
 
+## Repository
+
+- **GitHub:** https://github.com/MarkMurithi/dogkennelmanagemnt
+
 ## Run locally
 
 ```bash
