@@ -215,7 +215,7 @@ const App = {
 
     canAccessPage(page) {
         const role = KennelData.getCurrentUserRole();
-        if (role === 'staff' && page === 'finance') {
+        if (role === 'staff' && (page === 'finance' || page === 'settings')) {
             return false;
         }
         return true;
