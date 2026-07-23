@@ -39,8 +39,9 @@ def verify_password(stored_password, password):
 
 
 def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = Path(DB_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -179,6 +180,23 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pending_approvals (
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            action TEXT NOT NULL DEFAULT 'create',
+            payload TEXT NOT NULL,
+            actor_id TEXT,
+            actor_name TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            createdAt TEXT NOT NULL,
+            reviewedAt TEXT,
+            reviewedBy TEXT,
+            reviewNotes TEXT
+        )
+        """
+    )
     conn.commit()
 
     admin_row = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", ("admin@bigpaw.com",)).fetchone()
@@ -277,6 +295,175 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.close()
         except Exception:
             pass
+
+    def _create_pending_approval(self, actor, entity_type, payload, action="create"):
+        approval_id = "pa" + str(int(__import__("time").time() * 1000))
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO pending_approvals (id, entity_type, action, payload, actor_id, actor_name, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                approval_id,
+                entity_type,
+                action,
+                json.dumps(payload),
+                actor.get("id") if actor else None,
+                actor.get("name") if actor else None,
+                "pending",
+                self._now(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return approval_id
+
+    def _apply_pending_approval(self, approval_row):
+        payload = json.loads(approval_row["payload"]) if approval_row["payload"] else {}
+        entity_type = approval_row["entity_type"]
+        if entity_type == "dog":
+            return self._insert_dog_record(payload)
+        if entity_type == "puppy":
+            return self._insert_puppy_record(payload)
+        if entity_type == "finance":
+            return self._insert_finance_record(payload)
+        if entity_type == "event":
+            return self._insert_event_record(payload)
+        return None
+
+    def _insert_dog_record(self, payload):
+        name = str(payload.get("name", "")).strip()
+        breed = str(payload.get("breed", "")).strip()
+        gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+        if not name or not breed:
+            raise ValueError("A dog name and breed are required.")
+        if not gender:
+            raise ValueError("Please choose a gender for the dog.")
+        records = payload.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}
+        if not isinstance(records, dict):
+            raise ValueError("Dog records must be provided as an object.")
+        for record_type, entries in records.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                date_field = "date"
+                if record_type == "heatCycle":
+                    date_field = "startDate"
+                if record_type == "breeding" and not entry.get("expectedDate") and not entry.get("date"):
+                    raise ValueError(f"{record_type} records require a date.")
+                if not entry.get(date_field):
+                    if record_type != "breeding":
+                        raise ValueError(f"{record_type} records require a date.")
+        conn = self._connect()
+        existing = conn.execute("SELECT id FROM dogs WHERE LOWER(name)=?", (name.lower(),)).fetchone()
+        if existing:
+            conn.close()
+            raise ValueError("A dog with this name already exists.")
+        dog_id = payload.get("id") or "d" + str(int(__import__("time").time() * 1000))
+        conn.execute(
+            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                dog_id,
+                name,
+                breed,
+                gender,
+                payload.get("dob"),
+                payload.get("status", "Active"),
+                payload.get("weight", ""),
+                payload.get("notes", ""),
+                payload.get("value", ""),
+                int(bool(payload.get("forSale", False))),
+                payload.get("price", ""),
+                payload.get("image", ""),
+                json.dumps(records),
+                json.dumps(payload.get("attachments") or []),
+                self._now(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {"id": dog_id, "name": name, "breed": breed, "gender": gender}
+
+    def _insert_puppy_record(self, payload):
+        name = str(payload.get("name", "")).strip()
+        gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+        if not name:
+            raise ValueError("A puppy name is required.")
+        if not gender:
+            raise ValueError("Please choose a gender for the puppy.")
+        conn = self._connect()
+        existing = conn.execute("SELECT id FROM puppies WHERE LOWER(name)=?", (name.lower(),)).fetchone()
+        if existing:
+            conn.close()
+            raise ValueError("A puppy with this name already exists.")
+        puppy_id = payload.get("id") or "p" + str(int(__import__("time").time() * 1000))
+        conn.execute(
+            "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                puppy_id,
+                name,
+                payload.get("dob"),
+                gender,
+                payload.get("saleStatus", "Available"),
+                payload.get("saleTotalAmount"),
+                payload.get("saleReceivedAmount"),
+                payload.get("saleUnpaidAmount"),
+                json.dumps(payload.get("vaccinations") or []),
+                json.dumps(payload.get("deworming") or []),
+                payload.get("father", ""),
+                payload.get("mother", ""),
+                payload.get("sireGrandfather", ""),
+                payload.get("sireGrandmother", ""),
+                payload.get("damGrandfather", ""),
+                payload.get("damGrandmother", ""),
+                payload.get("ownerName", ""),
+                payload.get("ownerPhone", ""),
+                payload.get("ownerAddress", ""),
+                self._now(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {"id": puppy_id, "name": name, "gender": gender}
+
+    def _insert_finance_record(self, payload):
+        title = str(payload.get("title", "")).strip()
+        category = str(payload.get("category", "")).strip()
+        amount = payload.get("amount")
+        date_value = str(payload.get("date") or "").strip() or self._date()
+        if not title:
+            raise ValueError("A transaction title is required.")
+        if not category:
+            raise ValueError("Please assign a category to the transaction.")
+        try:
+            numeric_amount = float(amount)
+        except (TypeError, ValueError):
+            raise ValueError("Please enter a valid numeric amount.")
+        if numeric_amount <= 0:
+            raise ValueError("The transaction amount must be greater than zero.")
+        entry_id = payload.get("id") or "f" + str(int(__import__("time").time() * 1000))
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO finance (id, type, title, category, amount, date, related, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (entry_id, payload.get("type", "expense"), title, category, numeric_amount, date_value, payload.get("related", ""), payload.get("notes", ""), self._now()),
+        )
+        conn.commit()
+        conn.close()
+        return {"id": entry_id, "title": title, "category": category, "amount": numeric_amount, "date": date_value}
+
+    def _insert_event_record(self, payload):
+        title = str(payload.get("title", "")).strip()
+        date_value = str(payload.get("date", "")).strip()
+        if not title:
+            raise ValueError("An event title is required.")
+        if not date_value:
+            raise ValueError("Please choose an event date.")
+        event_id = payload.get("id") or "ev" + str(int(__import__("time").time() * 1000))
+        conn = self._connect()
+        conn.execute("INSERT INTO events (id, title, date, notes, createdAt) VALUES (?, ?, ?, ?, ?)", (event_id, title, date_value, payload.get("notes", ""), self._now()))
+        conn.commit()
+        conn.close()
+        return {"id": event_id, "title": title, "date": date_value}
 
     def _ensure_backup_dir(self):
         backup_dir = ROOT / "backups"
@@ -553,6 +740,69 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "entries": payload})
             return
 
+        if path == "/api/pending-approvals" and method == "GET":
+            user = self._require_auth()
+            if not self._require_role(user, {"admin"}):
+                return
+            rows = self._fetch_all("SELECT id, entity_type, action, payload, actor_id, actor_name, status, createdAt, reviewedAt, reviewedBy, reviewNotes FROM pending_approvals WHERE status = 'pending' ORDER BY createdAt DESC")
+            payload = []
+            for row in rows:
+                payload.append({
+                    "id": row[0],
+                    "entityType": row[1],
+                    "action": row[2],
+                    "payload": json.loads(row[3]) if row[3] else {},
+                    "actorId": row[4],
+                    "actorName": row[5],
+                    "status": row[6],
+                    "createdAt": row[7],
+                    "reviewedAt": row[8],
+                    "reviewedBy": row[9],
+                    "reviewNotes": row[10],
+                })
+            self._send_json(200, {"ok": True, "items": payload})
+            return
+
+        if path.startswith("/api/pending-approvals/") and path.endswith("/approve") and method == "POST":
+            user = self._require_auth()
+            if not self._require_role(user, {"admin"}):
+                return
+            approval_id = path.split("/", 4)[3]
+            conn = self._connect()
+            row = conn.execute("SELECT id, entity_type, payload FROM pending_approvals WHERE id = ? AND status = 'pending'", (approval_id,)).fetchone()
+            if not row:
+                conn.close()
+                self._send_json(404, {"ok": False, "error": "Pending approval not found."})
+                return
+            try:
+                result = self._apply_pending_approval(row)
+            except ValueError as exc:
+                conn.close()
+                self._send_json(400, {"ok": False, "error": str(exc)})
+                return
+            conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("approved", self._now(), user.get("id"), "Approved", approval_id))
+            conn.commit()
+            conn.close()
+            self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "approve_pending", approval_id, f"Approved pending approval {approval_id}")
+            self._send_json(200, {"ok": True, "result": result})
+            return
+
+        if path.startswith("/api/pending-approvals/") and path.endswith("/reject") and method == "POST":
+            user = self._require_auth()
+            if not self._require_role(user, {"admin"}):
+                return
+            approval_id = path.split("/", 4)[3]
+            payload = self._parse_json(body)
+            notes = str(payload.get("notes", "Rejected")).strip() or "Rejected"
+            conn = self._connect()
+            conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("rejected", self._now(), user.get("id"), notes, approval_id))
+            conn.commit()
+            conn.close()
+            self._log_audit(user, "reject_pending", approval_id, f"Rejected pending approval {approval_id}")
+            self._send_json(200, {"ok": True})
+            return
+
         if path == "/api/backups" and method == "GET":
             user = self._require_auth()
             if not self._require_role(user, {"admin"}):
@@ -754,71 +1004,26 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") == "staff":
-                self._send_json(403, {"ok": False, "error": "Access denied."})
-                return
             payload = self._parse_json(body)
-            name = str(payload.get("name", "")).strip()
-            breed = str(payload.get("breed", "")).strip()
-            gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
-            if not name or not breed:
-                self._send_json(400, {"ok": False, "error": "A dog name and breed are required."})
+            if user.get("role") == "staff":
+                try:
+                    approval_id = self._create_pending_approval(user, "dog", payload)
+                except Exception:
+                    approval_id = None
+                if approval_id:
+                    self._log_audit(user, "submit_pending_dog", approval_id, f"Submitted dog for approval: {payload.get('name', '')}")
+                    self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                    return
+                self._send_json(500, {"ok": False, "error": "Unable to queue dog for approval."})
                 return
-            if not gender:
-                self._send_json(400, {"ok": False, "error": "Please choose a gender for the dog."})
+            try:
+                created = self._insert_dog_record(payload)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            records = payload.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}
-            if not isinstance(records, dict):
-                self._send_json(400, {"ok": False, "error": "Dog records must be provided as an object."})
-                return
-            for record_type, entries in records.items():
-                if not isinstance(entries, list):
-                    continue
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        continue
-                    date_field = "date"
-                    if record_type == "heatCycle":
-                        date_field = "startDate"
-                    if record_type == "breeding" and not entry.get("expectedDate") and not entry.get("date"):
-                        self._send_json(400, {"ok": False, "error": f"{record_type} records require a date."})
-                        return
-                    if not entry.get(date_field):
-                        if record_type != "breeding":
-                            self._send_json(400, {"ok": False, "error": f"{record_type} records require a date."})
-                            return
-            conn = self._connect()
-            existing = conn.execute("SELECT id FROM dogs WHERE LOWER(name)=?", (name.lower(),)).fetchone()
-            if existing:
-                conn.close()
-                self._send_json(409, {"ok": False, "error": "A dog with this name already exists."})
-                return
-            dog_id = payload.get("id") or "d" + str(int(__import__("time").time() * 1000))
-            conn.execute(
-                "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    dog_id,
-                    name,
-                    breed,
-                    gender,
-                    payload.get("dob"),
-                    payload.get("status", "Active"),
-                    payload.get("weight", ""),
-                    payload.get("notes", ""),
-                    payload.get("value", ""),
-                    int(bool(payload.get("forSale", False))),
-                    payload.get("price", ""),
-                    payload.get("image", ""),
-                    json.dumps(records),
-                    json.dumps(payload.get("attachments") or []),
-                    self._now(),
-                ),
-            )
-            conn.commit()
-            conn.close()
             self._create_backup(label="Auto-export", source="auto")
-            self._log_audit(user, "create_dog", dog_id, f"Created dog {name}")
-            self._send_json(200, {"ok": True, "dog": {**payload, "id": dog_id, "name": name, "breed": breed, "gender": gender}})
+            self._log_audit(user, "create_dog", created.get("id"), f"Created dog {created.get('name')}")
+            self._send_json(200, {"ok": True, "dog": {**payload, **created}})
             return
 
         if path.startswith("/api/dogs/") and method in {"PUT", "DELETE"}:
@@ -934,50 +1139,19 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             payload = self._parse_json(body)
-            name = str(payload.get("name", "")).strip()
-            gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
-            if not name:
-                self._send_json(400, {"ok": False, "error": "A puppy name is required."})
+            if user.get("role") == "staff":
+                approval_id = self._create_pending_approval(user, "puppy", payload)
+                self._log_audit(user, "submit_pending_puppy", approval_id, f"Submitted puppy for approval: {payload.get('name', '')}")
+                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
                 return
-            if not gender:
-                self._send_json(400, {"ok": False, "error": "Please choose a gender for the puppy."})
+            try:
+                created = self._insert_puppy_record(payload)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            conn = self._connect()
-            existing = conn.execute("SELECT id FROM puppies WHERE LOWER(name)=?", (name.lower(),)).fetchone()
-            if existing:
-                conn.close()
-                self._send_json(409, {"ok": False, "error": "A puppy with this name already exists."})
-                return
-            puppy_id = payload.get("id") or "p" + str(int(__import__("time").time() * 1000))
-            conn.execute(
-                "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    puppy_id,
-                    name,
-                    payload.get("dob"),
-                    gender,
-                    payload.get("saleStatus", "Available"),
-                    payload.get("saleTotalAmount"),
-                    payload.get("saleReceivedAmount"),
-                    payload.get("saleUnpaidAmount"),
-                    json.dumps(payload.get("vaccinations") or []),
-                    json.dumps(payload.get("deworming") or []),
-                    payload.get("father", ""),
-                    payload.get("mother", ""),
-                    payload.get("sireGrandfather", ""),
-                    payload.get("sireGrandmother", ""),
-                    payload.get("damGrandfather", ""),
-                    payload.get("damGrandmother", ""),
-                    payload.get("ownerName", ""),
-                    payload.get("ownerPhone", ""),
-                    payload.get("ownerAddress", ""),
-                    self._now(),
-                ),
-            )
-            conn.commit()
-            conn.close()
             self._create_backup(label="Auto-export", source="auto")
-            self._send_json(200, {"ok": True, "puppy": {**payload, "id": puppy_id, "name": name, "gender": gender}})
+            self._log_audit(user, "create_puppy", created.get("id"), f"Created puppy {created.get('name')}")
+            self._send_json(200, {"ok": True, "puppy": {**payload, **created}})
             return
 
         if path.startswith("/api/puppies/") and method == "DELETE":
@@ -1007,38 +1181,24 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/finance" and method == "POST":
             user = self._require_auth()
+            if not user:
+                return
+            if user.get("role") == "staff":
+                approval_id = self._create_pending_approval(user, "finance", self._parse_json(body))
+                self._log_audit(user, "submit_pending_finance", approval_id, f"Submitted finance entry for approval")
+                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                return
             if not self._require_role(user, {"admin"}):
                 return
             payload = self._parse_json(body)
-            title = str(payload.get("title", "")).strip()
-            category = str(payload.get("category", "")).strip()
-            amount = payload.get("amount")
-            date_value = str(payload.get("date") or "").strip() or self._date()
-            if not title:
-                self._send_json(400, {"ok": False, "error": "A transaction title is required."})
-                return
-            if not category:
-                self._send_json(400, {"ok": False, "error": "Please assign a category to the transaction."})
-                return
             try:
-                numeric_amount = float(amount)
-            except (TypeError, ValueError):
-                self._send_json(400, {"ok": False, "error": "Please enter a valid numeric amount."})
+                created = self._insert_finance_record(payload)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            if numeric_amount <= 0:
-                self._send_json(400, {"ok": False, "error": "The transaction amount must be greater than zero."})
-                return
-            entry_id = payload.get("id") or "f" + str(int(__import__("time").time() * 1000))
-            conn = self._connect()
-            conn.execute(
-                "INSERT INTO finance (id, type, title, category, amount, date, related, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (entry_id, payload.get("type", "expense"), title, category, numeric_amount, date_value, payload.get("related", ""), payload.get("notes", ""), self._now()),
-            )
-            conn.commit()
-            conn.close()
             self._create_backup(label="Auto-export", source="auto")
-            self._log_audit(user, "create_finance", entry_id, f"Created finance entry {title}")
-            self._send_json(200, {"ok": True, "entry": {**payload, "id": entry_id, "title": title, "category": category, "amount": numeric_amount, "date": date_value}})
+            self._log_audit(user, "create_finance", created.get("id"), f"Created finance entry {created.get('title')}")
+            self._send_json(200, {"ok": True, "entry": {**payload, **created}})
             return
 
         if path.startswith("/api/finance/") and method == "DELETE":
@@ -1069,21 +1229,19 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             payload = self._parse_json(body)
-            title = str(payload.get("title", "")).strip()
-            date_value = str(payload.get("date", "")).strip()
-            if not title:
-                self._send_json(400, {"ok": False, "error": "An event title is required."})
+            if user.get("role") == "staff":
+                approval_id = self._create_pending_approval(user, "event", payload)
+                self._log_audit(user, "submit_pending_event", approval_id, f"Submitted event for approval")
+                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
                 return
-            if not date_value:
-                self._send_json(400, {"ok": False, "error": "Please choose an event date."})
+            try:
+                created = self._insert_event_record(payload)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            event_id = payload.get("id") or "ev" + str(int(__import__("time").time() * 1000))
-            conn = self._connect()
-            conn.execute("INSERT INTO events (id, title, date, notes, createdAt) VALUES (?, ?, ?, ?, ?)", (event_id, title, date_value, payload.get("notes", ""), self._now()))
-            conn.commit()
-            conn.close()
             self._create_backup(label="Auto-export", source="auto")
-            self._send_json(200, {"ok": True, "event": {**payload, "id": event_id, "title": title, "date": date_value}})
+            self._log_audit(user, "create_event", created.get("id"), f"Created event {created.get('title')}")
+            self._send_json(200, {"ok": True, "event": {**payload, **created}})
             return
 
         if path.startswith("/api/events/") and method == "DELETE":

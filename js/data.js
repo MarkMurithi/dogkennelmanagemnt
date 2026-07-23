@@ -6,9 +6,10 @@ const KennelData = {
     _events: [],
     _finance: [],
     _users: [],
+    _pendingApprovals: [],
     _currentUser: null,
     _listeners: [],
-    _DATA_VERSION: 11,
+    _DATA_VERSION: 12,
     apiBase: (function() {
         if (typeof window === 'undefined' || !window.location) {
             return 'http://127.0.0.1:8001/api';
@@ -36,6 +37,7 @@ const KennelData = {
                     this._events = parsed.events || [];
                     this._finance = parsed.finance || [];
                     this._users = Array.isArray(parsed.users) ? parsed.users : [];
+                    this._pendingApprovals = Array.isArray(parsed.pendingApprovals) ? parsed.pendingApprovals : [];
                     this._currentUser = parsed.currentUser || this._restoreAuthState();
                 } else {
                     this._resetEmptyState();
@@ -101,6 +103,7 @@ const KennelData = {
         this._events = [];
         this._finance = [];
         this._users = [];
+        this._pendingApprovals = [];
         this._currentUser = null;
         this._save();
     },
@@ -114,6 +117,7 @@ const KennelData = {
             events: this._events,
             finance: this._finance,
             users: this._users,
+            pendingApprovals: this._pendingApprovals,
             currentUser: this._currentUser
         }));
     },
@@ -201,32 +205,25 @@ const KennelData = {
     addPuppy(puppy) {
         const tempId = 'p' + Date.now();
         puppy.id = tempId;
-        this._puppies.push(puppy);
-        this._save();
-        this._notify();
         return this._request('/puppies', {
             method: 'POST',
             body: JSON.stringify(puppy)
         }).then(function(result) {
             if (!result || !result.ok) {
-                this._puppies = this._puppies.filter(function(item) { return item.id !== tempId; });
-                this._save();
-                this._notify();
+                return result;
+            }
+            if (result.pending) {
                 return result;
             }
             if (result.puppy) {
-                const idx = this._puppies.findIndex(function(item) { return item.id === tempId; });
-                if (idx !== -1) {
-                    this._puppies[idx] = Object.assign({}, puppy, result.puppy);
-                    this._save();
-                    this._notify();
-                }
+                const createdPuppy = Object.assign({}, puppy, result.puppy);
+                createdPuppy.id = result.puppy.id || createdPuppy.id;
+                this._puppies.push(createdPuppy);
+                this._save();
+                this._notify();
             }
             return result;
         }.bind(this)).catch(function() {
-            this._puppies = this._puppies.filter(function(item) { return item.id !== tempId; });
-            this._save();
-            this._notify();
             return { ok: false, error: 'Unable to save puppy right now.' };
         }.bind(this));
     },
@@ -253,33 +250,26 @@ const KennelData = {
         const tempId = 'd' + Date.now();
         dog.id = tempId;
         if (!dog.records) dog.records = { health: [], vaccination: [], deworming: [], breeding: [], heatCycle: [], training: [] };
-        this._dogs.push(dog);
-        this._addActivity('added', '<strong>' + dog.name + '</strong> added to kennel', 'green');
-        this._save();
-        this._notify();
         return this._request('/dogs', {
             method: 'POST',
             body: JSON.stringify(dog)
         }).then(function(result) {
             if (!result || !result.ok) {
-                this._dogs = this._dogs.filter(function(item) { return item.id !== tempId; });
-                this._save();
-                this._notify();
+                return result;
+            }
+            if (result.pending) {
                 return result;
             }
             if (result.dog) {
-                const idx = this._dogs.findIndex(function(item) { return item.id === tempId; });
-                if (idx !== -1) {
-                    this._dogs[idx] = Object.assign({}, dog, result.dog);
-                    this._save();
-                    this._notify();
-                }
+                const createdDog = Object.assign({}, dog, result.dog);
+                createdDog.id = result.dog.id || createdDog.id;
+                this._dogs.push(createdDog);
+                this._addActivity('added', '<strong>' + createdDog.name + '</strong> added to kennel', 'green');
+                this._save();
+                this._notify();
             }
             return result;
         }.bind(this)).catch(function() {
-            this._dogs = this._dogs.filter(function(item) { return item.id !== tempId; });
-            this._save();
-            this._notify();
             return { ok: false, error: 'Unable to save dog right now.' };
         }.bind(this));
     },
@@ -374,32 +364,25 @@ const KennelData = {
         entry.id = tempId;
         entry.amount = Number(entry.amount) || 0;
         entry.date = entry.date || new Date().toISOString().slice(0, 10);
-        this._finance.push(entry);
-        this._save();
-        this._notify();
         return this._request('/finance', {
             method: 'POST',
             body: JSON.stringify(entry)
         }).then(function(result) {
             if (!result || !result.ok) {
-                this._finance = this._finance.filter(function(item) { return item.id !== tempId; });
-                this._save();
-                this._notify();
+                return result;
+            }
+            if (result.pending) {
                 return result;
             }
             if (result.entry) {
-                const idx = this._finance.findIndex(function(item) { return item.id === tempId; });
-                if (idx !== -1) {
-                    this._finance[idx] = Object.assign({}, entry, result.entry);
-                    this._save();
-                    this._notify();
-                }
+                const createdEntry = Object.assign({}, entry, result.entry);
+                createdEntry.id = result.entry.id || createdEntry.id;
+                this._finance.push(createdEntry);
+                this._save();
+                this._notify();
             }
             return result;
         }.bind(this)).catch(function() {
-            this._finance = this._finance.filter(function(item) { return item.id !== tempId; });
-            this._save();
-            this._notify();
             return { ok: false, error: 'Unable to save transaction right now.' };
         }.bind(this));
     },
@@ -549,6 +532,64 @@ const KennelData = {
 
     getUsers() {
         return this._users.slice();
+    },
+
+    getPendingApprovals() {
+        return this._pendingApprovals.slice();
+    },
+
+    loadPendingApprovals() {
+        return this._request('/pending-approvals').then(function(result) {
+            if (result && Array.isArray(result.items)) {
+                this._pendingApprovals = result.items;
+                this._save();
+                this._notify();
+                return result.items;
+            }
+            this._pendingApprovals = [];
+            this._save();
+            this._notify();
+            return [];
+        }.bind(this)).catch(function() {
+            this._pendingApprovals = [];
+            this._save();
+            this._notify();
+            return [];
+        }.bind(this));
+    },
+
+    approvePendingApproval(id, notes) {
+        return this._request('/pending-approvals/' + id + '/approve', {
+            method: 'POST',
+            body: JSON.stringify({ notes: notes || '' })
+        }).then(function(result) {
+            if (result && result.ok) {
+                this._pendingApprovals = this._pendingApprovals.filter(function(item) { return item.id !== id; });
+                this._save();
+                this._notify();
+                this._syncFromServer();
+            }
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to approve the submission.' };
+        }.bind(this));
+    },
+
+    rejectPendingApproval(id, notes) {
+        return this._request('/pending-approvals/' + id + '/reject', {
+            method: 'POST',
+            body: JSON.stringify({ notes: notes || 'Rejected' })
+        }).then(function(result) {
+            if (result && result.ok) {
+                this._pendingApprovals = this._pendingApprovals.filter(function(item) { return item.id !== id; });
+                this._save();
+                this._notify();
+                this._syncFromServer();
+            }
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to reject the submission.' };
+        }.bind(this));
     },
 
     loadUsers() {

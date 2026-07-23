@@ -86,6 +86,7 @@ const App = {
         if (this.currentPage === 'settings') {
             if (KennelData.getCurrentUserRole() === 'admin') {
                 KennelData.loadUsers().catch(function() {});
+                KennelData.loadPendingApprovals().catch(function() {});
             }
         }
 
@@ -141,6 +142,13 @@ const App = {
                     KennelData.addPuppy(puppyData).then((result) => {
                         if (!result || !result.ok) {
                             Components.toast(result && result.error ? result.error : 'Unable to save puppy', 'error');
+                            return;
+                        }
+
+                        if (result.pending) {
+                            Components.toast('Your puppy submission is pending admin approval.');
+                            form.reset();
+                            this.render();
                             return;
                         }
 
@@ -204,7 +212,11 @@ const App = {
                             Components.toast(result && result.error ? result.error : 'Unable to save transaction', 'error');
                             return;
                         }
-                        Components.toast(entry.type === 'sale' ? 'Sale recorded successfully' : 'Expense recorded successfully');
+                        if (result.pending) {
+                            Components.toast('Your transaction is pending admin approval.');
+                        } else {
+                            Components.toast(entry.type === 'sale' ? 'Sale recorded successfully' : 'Expense recorded successfully');
+                        }
                         form.reset();
                         this.render();
                     });
@@ -255,6 +267,35 @@ const App = {
                 this.render();
             } else {
                 Components.toast(result.error || 'Unable to update user', 'error');
+            }
+        }.bind(this));
+    },
+
+    approvePendingApproval(approvalId) {
+        if (!window.confirm('Approve this pending submission?')) {
+            return;
+        }
+        KennelData.approvePendingApproval(approvalId).then(function(result) {
+            if (result.ok) {
+                Components.toast('Submission approved');
+                this.render();
+            } else {
+                Components.toast(result.error || 'Unable to approve submission', 'error');
+            }
+        }.bind(this));
+    },
+
+    rejectPendingApproval(approvalId) {
+        const notes = window.prompt('Add a rejection note', 'Rejected');
+        if (notes === null) {
+            return;
+        }
+        KennelData.rejectPendingApproval(approvalId, notes).then(function(result) {
+            if (result.ok) {
+                Components.toast('Submission rejected');
+                this.render();
+            } else {
+                Components.toast(result.error || 'Unable to reject submission', 'error');
             }
         }.bind(this));
     },
@@ -554,7 +595,11 @@ const App = {
                         Components.toast(result && result.error ? result.error : 'Unable to save dog', 'error');
                         return;
                     }
-                    Components.toast(dogId ? `${dogData.name} updated successfully!` : `${dogData.name} added to kennel!`);
+                    if (result.pending) {
+                        Components.toast(dogId ? `${dogData.name} update submitted for admin approval.` : `${dogData.name} submitted for admin approval.`);
+                    } else {
+                        Components.toast(dogId ? `${dogData.name} updated successfully!` : `${dogData.name} added to kennel!`);
+                    }
                     document.getElementById('dogModal').classList.remove('open');
                     this.closeDogDetail();
                     this.render();

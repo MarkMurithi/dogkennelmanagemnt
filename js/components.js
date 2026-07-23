@@ -592,7 +592,9 @@ const Components = {
         var adminBadge = role === 'admin' ? '<span class="status-pill active">Admin</span>' : '<span class="status-pill">Staff</span>';
         var summaryCards = '';
         var users = KennelData.getUsers();
+        var pendingApprovals = KennelData.getPendingApprovals();
         var userRows = '';
+        var pendingRows = '';
 
         if (!users.length) {
             userRows = '<p style="color:var(--gray-400)">No users yet.</p>';
@@ -627,6 +629,26 @@ const Components = {
             '</div>' +
             '<input type="file" id="importDataInput" accept="application/json" style="display:none" onchange="App.handleImportData(this.files[0])">' +
             '<button class="btn btn-secondary" style="margin-top:12px" onclick="App.resetAppData()"><i class="fas fa-trash"></i> Clear all data</button></div></div>';
+
+        if (!pendingApprovals.length) {
+            pendingRows = '<p style="color:var(--gray-400)">No items need review right now.</p>';
+        } else {
+            for (var j = 0; j < pendingApprovals.length; j++) {
+                var approval = pendingApprovals[j];
+                var label = approval.entityType || 'item';
+                var payload = approval.payload || {};
+                var summaryText = payload.name || payload.title || payload.email || 'Pending item';
+                pendingRows += '<div class="card section-card" style="margin-bottom:10px">' +
+                    '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+                    '<div><strong>' + summaryText + '</strong><br><span style="color:var(--gray-500);font-size:0.9rem">' + label + ' • submitted by ' + (approval.actorName || 'staff') + '</span></div>' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                    '<button class="btn btn-sm btn-secondary" onclick="App.approvePendingApproval(\'' + approval.id + '\')">Approve</button>' +
+                    '<button class="btn btn-sm btn-secondary" onclick="App.rejectPendingApproval(\'' + approval.id + '\')">Reject</button>' +
+                    '</div></div></div>';
+            }
+        }
+
+        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3></div><div class="card-body">' + pendingRows + '</div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
             '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
