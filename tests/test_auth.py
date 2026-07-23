@@ -99,6 +99,37 @@ class AuthFlowTests(unittest.TestCase):
         self.assertTrue(disable_result.get("ok"), disable_result)
         self.assertFalse(disable_result.get("user", {}).get("active", True))
 
+    def test_staff_cannot_access_finance_and_admin_can_view_audit_logs(self):
+        admin_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "admin@bigpaw.com", "password": "admin123"},
+        )
+        self.assertTrue(admin_login.get("ok"), admin_login)
+        admin_token = admin_login.get("token")
+
+        create_result = self._request_json(
+            "/api/users",
+            {"name": "Staff User", "email": "staff2@example.com", "password": "staffpass", "role": "staff", "active": True},
+            token=admin_token,
+        )
+        self.assertTrue(create_result.get("ok"), create_result)
+
+        staff_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "staff2@example.com", "password": "staffpass"},
+        )
+        self.assertTrue(staff_login.get("ok"), staff_login)
+        staff_token = staff_login.get("token")
+
+        finance_result = self._request_json("/api/finance", token=staff_token)
+        self.assertIsInstance(finance_result, dict)
+        self.assertFalse(finance_result.get("ok", True), finance_result)
+        self.assertIn("access", str(finance_result.get("error", "")).lower())
+
+        audit_result = self._request_json("/api/audit-logs", token=admin_token)
+        self.assertTrue(audit_result.get("ok"), audit_result)
+        self.assertTrue(isinstance(audit_result.get("entries"), list), audit_result)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -166,6 +166,19 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id TEXT PRIMARY KEY,
+            actor_id TEXT,
+            actor_name TEXT,
+            action TEXT NOT NULL,
+            target TEXT,
+            details TEXT,
+            createdAt TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
     admin_row = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", ("admin@bigpaw.com",)).fetchone()
@@ -235,6 +248,35 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(401, {"ok": False, "error": "Authentication required."})
             return None
         return user
+
+    def _require_role(self, user, roles):
+        if not user:
+            self._send_json(401, {"ok": False, "error": "Authentication required."})
+            return False
+        if user.get("role") not in roles:
+            self._send_json(403, {"ok": False, "error": "Access denied."})
+            return False
+        return True
+
+    def _log_audit(self, actor, action, target=None, details=None):
+        try:
+            conn = self._connect()
+            conn.execute(
+                "INSERT INTO audit_logs (id, actor_id, actor_name, action, target, details, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "al" + str(int(__import__("time").time() * 1000)),
+                    actor.get("id") if actor else None,
+                    actor.get("name") if actor else None,
+                    action,
+                    target,
+                    details,
+                    self._now(),
+                ),
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
     def _ensure_backup_dir(self):
         backup_dir = ROOT / "backups"
@@ -502,9 +544,18 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True})
             return
 
+        if path == "/api/audit-logs" and method in {"GET", "POST"}:
+            user = self._require_auth()
+            if not self._require_role(user, {"admin"}):
+                return
+            rows = self._fetch_all("SELECT id, actor_id, actor_name, action, target, details, createdAt FROM audit_logs ORDER BY createdAt DESC LIMIT 50")
+            payload = [{"id": row[0], "actorId": row[1], "actorName": row[2], "action": row[3], "target": row[4], "details": row[5], "createdAt": row[6]} for row in rows]
+            self._send_json(200, {"ok": True, "entries": payload})
+            return
+
         if path == "/api/backups" and method == "GET":
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             rows = self._fetch_all("SELECT id, label, createdAt, filePath, size, source FROM backup_history ORDER BY createdAt DESC LIMIT 12")
             payload = [{"id": row[0], "label": row[1], "createdAt": row[2], "filePath": row[3], "size": row[4], "source": row[5]} for row in rows]
@@ -513,7 +564,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/backups" and method == "POST":
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             payload = self._parse_json(body)
             label = str(payload.get("label", "")).strip() or "Manual backup"
@@ -523,7 +574,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/backups/restore" and method == "POST":
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             payload = self._parse_json(body)
             backup_id = str(payload.get("backupId", "")).strip()
@@ -535,12 +586,13 @@ class KennelHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"ok": False, "error": "Backup not found."})
                 return
             self._create_backup(label="Restore snapshot", source="restore")
+            self._log_audit(user, "restore_backup", backup_id, f"Restored backup {backup_id}")
             self._send_json(200, {"ok": True, "message": "Backup restored successfully."})
             return
 
         if path == "/api/users" and method == "GET":
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             rows = self._fetch_all("SELECT id, name, email, role, active, createdAt FROM users ORDER BY createdAt DESC")
             payload = [{"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]} for row in rows]
@@ -549,7 +601,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/users" and method == "POST":
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             payload = self._parse_json(body)
             name = str(payload.get("name", "")).strip()
@@ -571,6 +623,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 row = conn.execute("SELECT id, name, email, role, active, createdAt FROM users WHERE id = ?", (user_id,)).fetchone()
                 conn.close()
                 self._create_backup(label="Auto-export", source="auto")
+                self._log_audit(user, "create_user", user_id, f"Created user {name} ({email})")
                 self._send_json(200, {"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]}})
             except sqlite3.IntegrityError:
                 conn.close()
@@ -579,7 +632,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/users/") and method in {"PUT", "DELETE"}:
             user = self._require_auth()
-            if not user or user.get("role") != "admin":
+            if not self._require_role(user, {"admin"}):
                 return
             target_id = path.split("/", 3)[3]
             if method == "PUT":
@@ -608,6 +661,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 row = conn.execute("SELECT id, name, email, role, active, createdAt FROM users WHERE id = ?", (target_id,)).fetchone()
                 conn.close()
                 self._create_backup(label="Auto-export", source="auto")
+                self._log_audit(user, "update_user", target_id, f"Updated user {row[1] if row else target_id}")
                 self._send_json(200, {"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]}})
                 return
             conn = self._connect()
@@ -615,6 +669,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "delete_user", target_id, f"Deleted user {target_id}")
             self._send_json(200, {"ok": True})
             return
 
@@ -699,6 +754,9 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
+            if user.get("role") == "staff":
+                self._send_json(403, {"ok": False, "error": "Access denied."})
+                return
             payload = self._parse_json(body)
             name = str(payload.get("name", "")).strip()
             breed = str(payload.get("breed", "")).strip()
@@ -759,12 +817,16 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "create_dog", dog_id, f"Created dog {name}")
             self._send_json(200, {"ok": True, "dog": {**payload, "id": dog_id, "name": name, "breed": breed, "gender": gender}})
             return
 
         if path.startswith("/api/dogs/") and method in {"PUT", "DELETE"}:
             user = self._require_auth()
             if not user:
+                return
+            if user.get("role") == "staff":
+                self._send_json(403, {"ok": False, "error": "Access denied."})
                 return
             dog_id = path.split("/", 3)[3]
             if method == "PUT":
@@ -823,6 +885,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.commit()
                 conn.close()
                 self._create_backup(label="Auto-export", source="auto")
+                self._log_audit(user, "update_dog", dog_id, f"Updated dog {name}")
                 self._send_json(200, {"ok": True, "dog": {**payload, "name": name, "breed": breed, "gender": gender}})
                 return
             conn = self._connect()
@@ -830,6 +893,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "delete_dog", dog_id, f"Deleted dog {dog_id}")
             self._send_json(200, {"ok": True})
             return
 
@@ -931,7 +995,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/finance" and method == "GET":
             user = self._require_auth()
-            if not user:
+            if not self._require_role(user, {"admin"}):
                 return
             rows = self._fetch_all("SELECT * FROM finance ORDER BY date DESC, createdAt DESC")
             payload = [
@@ -943,7 +1007,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/finance" and method == "POST":
             user = self._require_auth()
-            if not user:
+            if not self._require_role(user, {"admin"}):
                 return
             payload = self._parse_json(body)
             title = str(payload.get("title", "")).strip()
@@ -973,12 +1037,13 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "create_finance", entry_id, f"Created finance entry {title}")
             self._send_json(200, {"ok": True, "entry": {**payload, "id": entry_id, "title": title, "category": category, "amount": numeric_amount, "date": date_value}})
             return
 
         if path.startswith("/api/finance/") and method == "DELETE":
             user = self._require_auth()
-            if not user:
+            if not self._require_role(user, {"admin"}):
                 return
             entry_id = path.split("/", 3)[3]
             conn = self._connect()
@@ -986,6 +1051,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "delete_finance", entry_id, f"Deleted finance entry {entry_id}")
             self._send_json(200, {"ok": True})
             return
 
