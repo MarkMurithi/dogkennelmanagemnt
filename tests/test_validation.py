@@ -55,6 +55,14 @@ class ValidationTests(unittest.TestCase):
         login = self._request_json("/api/auth/login", {"identifier": "admin@bigpaw.com", "password": "admin123"})
         return login.get("token")
 
+    def test_init_db_creates_missing_parent_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "nested" / "data" / "test.db"
+            server.DB_PATH = db_path
+            server.init_db()
+            self.assertTrue(db_path.parent.exists())
+            self.assertTrue(db_path.exists())
+
     def test_dog_validation_requires_name_and_breed(self):
         result = self._request_json(
             "/api/dogs",
