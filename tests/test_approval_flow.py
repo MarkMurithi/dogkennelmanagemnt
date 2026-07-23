@@ -56,6 +56,63 @@ class ApprovalFlowTests(unittest.TestCase):
         server.init_db()
         self.assertTrue(self.db_path.exists())
 
+    def test_only_super_admin_can_hold_admin_role(self):
+        admin_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "admin@bigpaw.com", "password": "admin123"},
+        )
+        self.assertTrue(admin_login.get("ok"), admin_login)
+        admin_token = admin_login.get("token")
+
+        create_staff = self._request_json(
+            "/api/users",
+            {"name": "Limited Staff", "email": "limitedstaff@example.com", "password": "staffpass", "role": "staff", "active": True},
+            token=admin_token,
+        )
+        self.assertTrue(create_staff.get("ok"), create_staff)
+        created_user_id = create_staff["user"]["id"]
+
+        update_result = self._request_json(
+            f"/api/users/{created_user_id}",
+            {"role": "admin"},
+            token=admin_token,
+            method="PUT",
+        )
+        self.assertFalse(update_result.get("ok"), update_result)
+        self.assertIn("only", update_result.get("error", "").lower())
+
+        users_result = self._request_json("/api/users", token=admin_token, method="GET")
+        updated_user = next(user for user in users_result if user["id"] == created_user_id)
+        self.assertEqual("staff", updated_user["role"])
+
+    def test_reviewer_can_view_finance_and_pending_approvals(self):
+        admin_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "admin@bigpaw.com", "password": "admin123"},
+        )
+        self.assertTrue(admin_login.get("ok"), admin_login)
+        admin_token = admin_login.get("token")
+
+        create_reviewer = self._request_json(
+            "/api/users",
+            {"name": "Finance Reviewer", "email": "reviewer@example.com", "password": "staffpass", "role": "reviewer", "active": True},
+            token=admin_token,
+        )
+        self.assertTrue(create_reviewer.get("ok"), create_reviewer)
+
+        reviewer_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "reviewer@example.com", "password": "staffpass"},
+        )
+        self.assertTrue(reviewer_login.get("ok"), reviewer_login)
+        reviewer_token = reviewer_login.get("token")
+
+        finance_result = self._request_json("/api/finance", token=reviewer_token, method="GET")
+        self.assertEqual([], finance_result)
+
+        approvals_result = self._request_json("/api/pending-approvals", token=reviewer_token, method="GET")
+        self.assertTrue(approvals_result.get("ok"), approvals_result)
+
     def test_staff_create_requires_admin_approval(self):
         admin_login = self._request_json(
             "/api/auth/login",

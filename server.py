@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "kennel.db"
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8001"))
+SUPER_ADMIN_EMAIL = "admin@bigpaw.com"
 
 
 def hash_password(password):
@@ -138,6 +139,25 @@ def init_db():
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             date TEXT NOT NULL,
+            notes TEXT,
+            createdAt TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_reports (
+            id TEXT PRIMARY KEY,
+            date TEXT NOT NULL,
+            foodRemaining TEXT,
+            foodToday TEXT,
+            kennelsWashed INTEGER DEFAULT 0,
+            dogStatuses TEXT,
+            visitors TEXT,
+            personInCharge TEXT,
+            medicationNotes TEXT,
+            cleaningChecklist TEXT,
+            staffComments TEXT,
             notes TEXT,
             createdAt TEXT NOT NULL
         )
@@ -275,6 +295,15 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(403, {"ok": False, "error": "Access denied."})
             return False
         return True
+
+    def _is_super_admin(self, user):
+        return bool(user) and str(user.get("email", "")).strip().lower() == SUPER_ADMIN_EMAIL
+
+    def _normalize_role(self, role):
+        normalized = str(role or "staff").strip().lower() or "staff"
+        if normalized not in {"staff", "reviewer", "admin"}:
+            return "staff"
+        return normalized
 
     def _log_audit(self, actor, action, target=None, details=None):
         try:
@@ -742,7 +771,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/pending-approvals" and method == "GET":
             user = self._require_auth()
-            if not self._require_role(user, {"admin"}):
+            if not self._require_role(user, {"admin", "reviewer"}):
                 return
             rows = self._fetch_all("SELECT id, entity_type, action, payload, actor_id, actor_name, status, createdAt, reviewedAt, reviewedBy, reviewNotes FROM pending_approvals WHERE status = 'pending' ORDER BY createdAt DESC")
             payload = []
@@ -765,7 +794,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/pending-approvals/") and path.endswith("/approve") and method == "POST":
             user = self._require_auth()
-            if not self._require_role(user, {"admin"}):
+            if not self._require_role(user, {"admin", "reviewer"}):
                 return
             approval_id = path.split("/", 4)[3]
             conn = self._connect()
@@ -790,7 +819,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/pending-approvals/") and path.endswith("/reject") and method == "POST":
             user = self._require_auth()
-            if not self._require_role(user, {"admin"}):
+            if not self._require_role(user, {"admin", "reviewer"}):
                 return
             approval_id = path.split("/", 4)[3]
             payload = self._parse_json(body)
@@ -857,11 +886,18 @@ class KennelHandler(BaseHTTPRequestHandler):
             name = str(payload.get("name", "")).strip()
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
-            role = str(payload.get("role", "staff")).strip().lower() or "staff"
+            role = self._normalize_role(payload.get("role", "staff"))
             active = bool(payload.get("active", True))
             if not name or not email or not password:
                 self._send_json(400, {"ok": False, "error": "Please complete all fields."})
                 return
+            if role == "admin":
+                if not self._is_super_admin(user):
+                    self._send_json(403, {"ok": False, "error": "Only the super admin can assign the admin role."})
+                    return
+                if email != SUPER_ADMIN_EMAIL:
+                    self._send_json(403, {"ok": False, "error": "Only the super admin account may use the admin role."})
+                    return
             conn = self._connect()
             try:
                 user_id = "u" + str(int(__import__("time").time() * 1000))
@@ -897,8 +933,19 @@ class KennelHandler(BaseHTTPRequestHandler):
                     updates.append("email = ?")
                     values.append(str(payload.get("email", "")).strip().lower())
                 if "role" in payload:
+                    requested_role = self._normalize_role(payload.get("role", "staff"))
+                    if requested_role == "admin":
+                        if not self._is_super_admin(user):
+                            conn.close()
+                            self._send_json(403, {"ok": False, "error": "Only the super admin can assign the admin role."})
+                            return
+                        existing_user = conn.execute("SELECT email FROM users WHERE id = ?", (target_id,)).fetchone()
+                        if not existing_user or str(existing_user[0]).strip().lower() != SUPER_ADMIN_EMAIL:
+                            conn.close()
+                            self._send_json(403, {"ok": False, "error": "Only the super admin account may use the admin role."})
+                            return
                     updates.append("role = ?")
-                    values.append(str(payload.get("role", "staff")).strip().lower() or "staff")
+                    values.append(requested_role)
                 if "active" in payload:
                     updates.append("active = ?")
                     values.append(int(bool(payload.get("active", True))))
@@ -1169,7 +1216,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path == "/api/finance" and method == "GET":
             user = self._require_auth()
-            if not self._require_role(user, {"admin"}):
+            if not self._require_role(user, {"admin", "reviewer"}):
                 return
             rows = self._fetch_all("SELECT * FROM finance ORDER BY date DESC, createdAt DESC")
             payload = [
@@ -1222,6 +1269,83 @@ class KennelHandler(BaseHTTPRequestHandler):
             rows = self._fetch_all("SELECT * FROM events ORDER BY date ASC")
             payload = [{"id": row[0], "title": row[1], "date": row[2], "notes": row[3], "createdAt": row[4]} for row in rows]
             self._send_json(200, payload)
+            return
+
+        if path == "/api/daily-reports" and method == "GET":
+            user = self._require_auth()
+            if not user:
+                return
+            rows = self._fetch_all("SELECT * FROM daily_reports ORDER BY date DESC, createdAt DESC")
+            payload = []
+            for row in rows:
+                payload.append({
+                    "id": row[0],
+                    "date": row[1],
+                    "foodRemaining": row[2],
+                    "foodToday": row[3],
+                    "kennelsWashed": bool(row[4]),
+                    "dogStatuses": json.loads(row[5]) if row[5] else [],
+                    "visitors": row[6],
+                    "personInCharge": row[7],
+                    "medicationNotes": row[8],
+                    "cleaningChecklist": row[9],
+                    "staffComments": row[10],
+                    "notes": row[11],
+                    "createdAt": row[12],
+                })
+            self._send_json(200, payload)
+            return
+
+        if path == "/api/daily-reports" and method == "POST":
+            user = self._require_auth()
+            if not user:
+                return
+            payload = self._parse_json(body)
+            date_value = str(payload.get("date", "")).strip()
+            if not date_value:
+                self._send_json(400, {"ok": False, "error": "A report date is required."})
+                return
+            report_id = "dr" + str(int(__import__("time").time() * 1000))
+            dog_statuses = payload.get("dogStatuses") or []
+            if not isinstance(dog_statuses, list):
+                dog_statuses = []
+            conn = self._connect()
+            conn.execute(
+                "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    report_id,
+                    date_value,
+                    payload.get("foodRemaining", ""),
+                    payload.get("foodToday", ""),
+                    int(bool(payload.get("kennelsWashed", False))),
+                    json.dumps(dog_statuses),
+                    payload.get("visitors", ""),
+                    payload.get("personInCharge", ""),
+                    payload.get("medicationNotes", ""),
+                    payload.get("cleaningChecklist", ""),
+                    payload.get("staffComments", ""),
+                    payload.get("notes", ""),
+                    self._now(),
+                ),
+            )
+            conn.commit()
+            conn.close()
+            self._log_audit(user, "create_daily_report", report_id, f"Created daily report for {date_value}")
+            self._send_json(200, {"ok": True, "report": {
+                "id": report_id,
+                "date": date_value,
+                "foodRemaining": payload.get("foodRemaining", ""),
+                "foodToday": payload.get("foodToday", ""),
+                "kennelsWashed": bool(payload.get("kennelsWashed", False)),
+                "dogStatuses": dog_statuses,
+                "visitors": payload.get("visitors", ""),
+                "personInCharge": payload.get("personInCharge", ""),
+                "medicationNotes": payload.get("medicationNotes", ""),
+                "cleaningChecklist": payload.get("cleaningChecklist", ""),
+                "staffComments": payload.get("staffComments", ""),
+                "notes": payload.get("notes", ""),
+                "createdAt": self._now(),
+            }})
             return
 
         if path == "/api/events" and method == "POST":

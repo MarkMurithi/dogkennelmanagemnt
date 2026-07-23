@@ -5,6 +5,7 @@ const KennelData = {
     _activities: [],
     _events: [],
     _finance: [],
+    _dailyReports: [],
     _users: [],
     _pendingApprovals: [],
     _currentUser: null,
@@ -36,6 +37,7 @@ const KennelData = {
                     this._activities = parsed.activities || [];
                     this._events = parsed.events || [];
                     this._finance = parsed.finance || [];
+                    this._dailyReports = Array.isArray(parsed.dailyReports) ? parsed.dailyReports : [];
                     this._users = Array.isArray(parsed.users) ? parsed.users : [];
                     this._pendingApprovals = Array.isArray(parsed.pendingApprovals) ? parsed.pendingApprovals : [];
                     this._currentUser = parsed.currentUser || this._restoreAuthState();
@@ -89,6 +91,11 @@ const KennelData = {
             self._save();
             self._notify();
         }).catch(function() {});
+        this._request('/daily-reports').then(function(data) {
+            self._dailyReports = Array.isArray(data) ? data : [];
+            self._save();
+            self._notify();
+        }).catch(function() {});
         this._request('/activities').then(function(data) {
             self._activities = Array.isArray(data) ? data : [];
             self._save();
@@ -102,6 +109,7 @@ const KennelData = {
         this._activities = [];
         this._events = [];
         this._finance = [];
+        this._dailyReports = [];
         this._users = [];
         this._pendingApprovals = [];
         this._currentUser = null;
@@ -116,6 +124,7 @@ const KennelData = {
             activities: this._activities,
             events: this._events,
             finance: this._finance,
+            dailyReports: this._dailyReports,
             users: this._users,
             pendingApprovals: this._pendingApprovals,
             currentUser: this._currentUser
@@ -333,7 +342,8 @@ const KennelData = {
             puppies: this._puppies,
             activities: this._activities,
             events: this._events,
-            finance: this._finance
+            finance: this._finance,
+            dailyReports: this._dailyReports
         }, null, 2);
     },
 
@@ -348,6 +358,7 @@ const KennelData = {
         this._activities = Array.isArray(parsed.activities) ? parsed.activities : [];
         this._events = Array.isArray(parsed.events) ? parsed.events : [];
         this._finance = Array.isArray(parsed.finance) ? parsed.finance : [];
+        this._dailyReports = Array.isArray(parsed.dailyReports) ? parsed.dailyReports : [];
         this._save();
         this._notify();
         return parsed;
@@ -875,6 +886,25 @@ const KennelData = {
     // ===== Calendar Events =====
     getEvents() {
         return this._events.slice().sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+    },
+
+    getDailyReports() {
+        return this._dailyReports.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+    },
+
+    addDailyReport(report) {
+        const entry = Object.assign({ id: 'dr' + Date.now(), createdAt: new Date().toISOString() }, report);
+        return this._request('/daily-reports', {
+            method: 'POST',
+            body: JSON.stringify(entry)
+        }).then(function(result) {
+            if (result && result.report) {
+                KennelData._dailyReports.unshift(result.report);
+                KennelData._save();
+                KennelData._notify();
+            }
+            return result;
+        });
     },
 
     getEventsForDate(dateStr) {
