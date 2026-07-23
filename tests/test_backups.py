@@ -1,0 +1,88 @@
+import json
+import tempfile
+import threading
+import unittest
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+from urllib import error, request
+
+import server
+
+
+class BackupTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.temp_dir.name) / "test.db"
+        server.DB_PATH = self.db_path
+        server.init_db()
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.KennelHandler)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        self.base_url = f"http://127.0.0.1:{self.httpd.server_port}"
+
+    def tearDown(self):
+        try:
+            self.httpd.shutdown()
+        except Exception:
+            pass
+        try:
+            self.httpd.server_close()
+        except Exception:
+            pass
+        try:
+            self.thread.join(timeout=2)
+        except Exception:
+            pass
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
+
+    def _request_json(self, path, payload=None, method="POST", token=None):
+        data = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        req = request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
+        try:
+            with request.urlopen(req, timeout=3) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            body = exc.read().decode("utf-8")
+            return json.loads(body)
+
+    def _admin_token(self):
+        login = self._request_json("/api/auth/login", {"identifier": "admin@bigpaw.com", "password": "admin123"})
+        return login.get("token")
+
+    def test_manual_backup_and_history_are_created(self):
+        backup = self._request_json("/api/backups", {"label": "Release backup"}, token=self._admin_token())
+        self.assertTrue(backup.get("ok"), backup)
+        history = self._request_json("/api/backups", None, method="GET", token=self._admin_token())
+        self.assertTrue(isinstance(history, list), history)
+        self.assertGreaterEqual(len(history), 1)
+        self.assertEqual(history[0].get("label"), "Release backup")
+
+    def test_restore_backup_restores_deleted_dog(self):
+        created = self._request_json(
+            "/api/dogs",
+            {"name": "Max", "breed": "German Shepherd", "gender": "Male"},
+            token=self._admin_token(),
+        )
+        self.assertTrue(created.get("ok"), created)
+
+        backup = self._request_json("/api/backups", {"label": "Restore test"}, token=self._admin_token())
+        self.assertTrue(backup.get("ok"), backup)
+
+        deleted = self._request_json(f"/api/dogs/{created['dog']['id']}", None, method="DELETE", token=self._admin_token())
+        self.assertTrue(deleted.get("ok"), deleted)
+
+        restored = self._request_json("/api/backups/restore", {"backupId": backup["backup"]["id"]}, token=self._admin_token())
+        self.assertTrue(restored.get("ok"), restored)
+
+        dogs = self._request_json("/api/dogs", None, method="GET", token=self._admin_token())
+        self.assertTrue(any(item.get("name") == "Max" for item in dogs))
+
+
+if __name__ == "__main__":
+    unittest.main()
