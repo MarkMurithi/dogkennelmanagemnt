@@ -310,6 +310,77 @@ const Components = {
             alertsBadge = '<span style="background:var(--danger);color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem">' + alerts.length + '</span>';
         }
 
+        var spotlightTone = alerts.length > 0 ? 'warning' : 'positive';
+        var spotlightTitle = alerts.length > 0 ? 'Attention needed' : 'Everything looks calm';
+        var spotlightText = alerts.length > 0
+            ? (alerts[0].message || 'A care item is due soon.')
+            : (stats.total > 0 ? 'No urgent reminders right now — your kennel is in good shape.' : 'Add your first dog to start tracking care, sales, and upcoming milestones.');
+        var insightCardsHtml = '';
+        insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-bell"></i></div><div><h4>' + alerts.length + '</h4><p>Alerts</p></div></div>';
+        insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-calendar-check"></i></div><div><h4>' + stats.upcomingEvents.length + '</h4><p>Upcoming</p></div></div>';
+        insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-tags"></i></div><div><h4>' + stats.forSale + '</h4><p>For Sale</p></div></div>';
+
+        var todayFocusCount = 0;
+        var todayFocusLabel = 'No urgent items';
+        for (var i = 0; i < stats.upcomingEvents.length; i++) {
+            var upcomingEvent = stats.upcomingEvents[i];
+            var daysUntil = Math.ceil((new Date(upcomingEvent.nextDue) - new Date()) / (1000 * 60 * 60 * 24));
+            if (daysUntil <= 2 && daysUntil >= 0) todayFocusCount++;
+        }
+        if (todayFocusCount > 0) todayFocusLabel = todayFocusCount + ' item' + (todayFocusCount === 1 ? '' : 's') + ' in the next 48 hours';
+
+        var counterHtml = '';
+        var counterItems = [
+            { value: stats.total, label: 'Dogs on roster', icon: 'fa-dog' },
+            { value: alerts.length, label: 'Care reminders', icon: 'fa-bell' },
+            { value: stats.forSale, label: 'For sale', icon: 'fa-tag' }
+        ];
+        for (var i = 0; i < counterItems.length; i++) {
+            var counterItem = counterItems[i];
+            counterHtml += '<div class="overview-counter-card">' +
+                '<div class="overview-counter-icon"><i class="fas ' + counterItem.icon + '"></i></div>' +
+                '<div><div class="overview-counter-value" data-target="' + counterItem.value + '">0</div><div class="overview-counter-label">' + counterItem.label + '</div></div>' +
+                '</div>';
+        }
+
+        var summaryItemsHtml = '';
+        var summaryItems = [
+            { value: todayFocusCount, label: 'Due soon' },
+            { value: stats.active, label: 'Active dogs' },
+            { value: stats.upcomingEvents.length, label: 'Upcoming care items' }
+        ];
+        for (var i = 0; i < summaryItems.length; i++) {
+            var summaryItem = summaryItems[i];
+            summaryItemsHtml += '<div class="overview-summary-item"><div class="overview-summary-value">' + summaryItem.value + '</div><div class="overview-summary-label">' + summaryItem.label + '</div></div>';
+        }
+
+        var taskChartBuckets = {};
+        for (var i = 0; i < stats.upcomingEvents.length; i++) {
+            var taskItem = stats.upcomingEvents[i];
+            var bucketKey = taskItem.type || 'general';
+            taskChartBuckets[bucketKey] = (taskChartBuckets[bucketKey] || 0) + 1;
+        }
+
+        var taskChartHtml = '';
+        var taskKeys = Object.keys(taskChartBuckets);
+        if (taskKeys.length > 0) {
+            var maxBucketValue = 1;
+            for (var i = 0; i < taskKeys.length; i++) {
+                maxBucketValue = Math.max(maxBucketValue, taskChartBuckets[taskKeys[i]]);
+            }
+            for (var i = 0; i < taskKeys.length; i++) {
+                var chartKey = taskKeys[i];
+                var chartValue = taskChartBuckets[chartKey];
+                var chartWidth = Math.max(12, Math.round((chartValue / maxBucketValue) * 100));
+                taskChartHtml += '<div class="overview-chart-row">' +
+                    '<div class="overview-chart-meta"><strong>' + chartKey.charAt(0).toUpperCase() + chartKey.slice(1) + '</strong><span>' + chartValue + ' item' + (chartValue === 1 ? '' : 's') + '</span></div>' +
+                    '<div class="overview-chart-bar"><div class="overview-chart-fill" style="width:' + chartWidth + '%"></div></div>' +
+                    '</div>';
+            }
+        } else {
+            taskChartHtml = '<p class="overview-empty-state">No upcoming care tasks yet.</p>';
+        }
+
         var genderBarHtml;
         if (stats.total > 0) {
             var malePct = (stats.males/stats.total*100).toFixed(0);
@@ -391,6 +462,23 @@ const Components = {
             '<button class="btn btn-secondary" onclick="App.navigate(\'mydogs\')"><i class="fas fa-dog"></i> View Dogs</button>' +
             '</div>' +
             '</section>' +
+            '<div class="overview-spotlight-card ' + spotlightTone + '">' +
+            '<div>' +
+            '<div class="hero-badge"><i class="fas fa-sparkles"></i> Live pulse</div>' +
+            '<h3>' + spotlightTitle + '</h3>' +
+            '<p>' + spotlightText + '</p>' +
+            '</div>' +
+            '<div class="overview-spotlight-badge"><i class="fas fa-arrow-right"></i> ' + (stats.total > 0 ? 'Keep the day moving' : 'Start your first record') + '</div>' +
+            '</div>' +
+            '<div class="overview-insight-grid">' + insightCardsHtml + '</div>' +
+            '<div class="overview-dashboard-grid">' +
+            '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-sparkles"></i> Today at a glance</h3></div>' +
+            '<div class="card-body"><div class="overview-counter-strip">' + counterHtml + '</div>' +
+            '<div class="overview-summary-prompt">' + todayFocusLabel + '</div>' +
+            '<div class="overview-summary-grid">' + summaryItemsHtml + '</div></div></div>' +
+            '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-bar"></i> Upcoming care tasks</h3></div>' +
+            '<div class="card-body"><div class="overview-chart-list">' + taskChartHtml + '</div></div></div>' +
+            '</div>' +
             '<div class="section-header">' +
             '<h2><i class="fas fa-chart-pie"></i> Kennel Overview</h2>' +
             '<div class="section-badge"><i class="fas fa-circle-notch"></i> Live operations</div>' +
@@ -557,6 +645,42 @@ const Components = {
             '<div class="content-grid">' + cardsHtml + '</div></div>';
     },
 
+    dailyReportPage: function() {
+        var reports = KennelData.getDailyReports();
+        var dogs = KennelData.getDogs();
+        var dogOptionsHtml = '';
+        dogs.forEach(function(dog) {
+            dogOptionsHtml += '<option value="' + dog.id + '">' + dog.name + '</option>';
+        });
+        if (!dogOptionsHtml) {
+            dogOptionsHtml = '<option value="">No dogs available</option>';
+        }
+
+        var reportCardsHtml = '';
+        var summary = '';
+        if (reports.length === 0) {
+            reportCardsHtml = '<div class="card section-card"><div class="card-body"><p style="color:var(--gray-400)">No daily reports yet.</p></div></div>';
+            summary = '<p style="color:var(--gray-400)">No daily reports yet.</p>';
+        } else {
+            summary = '<div class="detail-info-grid"><div class="detail-info-item"><label>Latest report</label><p>' + new Date(reports[0].date).toLocaleDateString() + '</p></div><div class="detail-info-item"><label>Reports logged</label><p>' + reports.length + '</p></div><div class="detail-info-item"><label>Most recent staff</label><p>' + (reports[0].personInCharge || 'N/A') + '</p></div></div>';
+            for (var i = 0; i < reports.length; i++) {
+                var report = reports[i];
+                var statusesHtml = '';
+                var statuses = report.dogStatuses || [];
+                for (var j = 0; j < statuses.length; j++) {
+                    var status = statuses[j];
+                    statusesHtml += '<li><strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
+                }
+                reportCardsHtml += '<div class="card section-card" style="margin-bottom:12px"><div class="card-header"><h3><i class="fas fa-calendar-day"></i> ' + new Date(report.date).toLocaleDateString() + '</h3></div><div class="card-body"><div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div><div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Medication notes</label><p>' + (report.medicationNotes || 'N/A') + '</p></div><div class="detail-info-item"><label>Cleaning checklist</label><p>' + (report.cleaningChecklist || 'N/A') + '</p></div><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div><div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + statusesHtml + '</ul></div>' + (report.notes ? '<div style="margin-top:12px;padding:12px;border-radius:12px;background:var(--gray-50)"><strong>Notes</strong><p style="margin-top:6px;color:var(--gray-600)">' + report.notes + '</p></div>' : '') + '</div></div>';
+            }
+        }
+
+        return '<div class="page-shell" id="pageDailyReport">' +
+            '<section class="page-hero"><div><div class="hero-badge"><i class="fas fa-file-alt"></i> Daily Operations</div><h2>Daily report</h2><p>Capture the kennel’s day-to-day care, staffing, and visitor notes in one place.</p></div></section>' +
+            '<div class="content-grid"><div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-line"></i> Daily snapshot</h3></div><div class="card-body">' + summary + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.exportDailyReports()"><i class="fas fa-download"></i> Export reports</button></div></div></div><div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportCleaningChecklist">Cleaning checklist</label><textarea id="dailyReportCleaningChecklist" rows="2" placeholder="What was cleaned or restocked?"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-group"><label for="dailyReportNotes">Notes</label><textarea id="dailyReportNotes" rows="3" placeholder="Add any extra observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><input type="text" id="dailyReportDogHealth" placeholder="Good / Needs watch"></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><input type="text" id="dailyReportDogGrooming" placeholder="Clean / Needs grooming"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>' +
+            '<div class="card section-card full-width"><div class="card-header"><h3><i class="fas fa-history"></i> Previous reports</h3></div><div class="card-body">' + reportCardsHtml + '</div></div></div></div>';
+    },
+
     calendarPage: function() {
         var stats = KennelData.getStats();
         var upcomingHtml = '';
@@ -589,7 +713,11 @@ const Components = {
         var stats = KennelData.getStats() || {};
         var alertsCount = Array.isArray(stats.alerts) ? stats.alerts.length : 0;
         var upcomingCount = Array.isArray(stats.upcomingEvents) ? stats.upcomingEvents.length : 0;
-        var adminBadge = role === 'admin' ? '<span class="status-pill active">Admin</span>' : '<span class="status-pill">Staff</span>';
+        var roleBadge = role === 'admin'
+            ? '<span class="status-pill active">Admin</span>'
+            : role === 'reviewer'
+                ? '<span class="status-pill">Reviewer</span>'
+                : '<span class="status-pill">Staff</span>';
         var summaryCards = '';
         var users = KennelData.getUsers();
         var pendingApprovals = KennelData.getPendingApprovals();
@@ -619,7 +747,7 @@ const Components = {
             '<div class="detail-info-item"><label>Upcoming tasks</label><p>' + upcomingCount + '</p></div>' +
             '</div></div></div>';
 
-        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-user-shield"></i> Account access</h3></div><div class="card-body"><p><strong>' + (user && user.name ? user.name : 'Current user') + '</strong> is signed in as ' + role + '.</p><div style="margin-top:10px">' + adminBadge + '</div><p style="margin-top:12px;color:var(--gray-500)">Admin users can manage full kennel data, while staff accounts have limited access to protected areas.</p></div></div>';
+        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-user-shield"></i> Account access</h3></div><div class="card-body"><p><strong>' + (user && user.name ? user.name : 'Current user') + '</strong> is signed in as ' + role + '.</p><div style="margin-top:10px">' + roleBadge + '</div><p style="margin-top:12px;color:var(--gray-500)">' + (role === 'reviewer' ? 'Reviewers can inspect finance activity and approval queues without changing workspace settings.' : 'Admin users can manage full kennel data, while staff accounts have limited access to protected areas.') + '</p></div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-sync"></i> Data tools</h3></div><div class="card-body"><p>Your kennel data is saved locally and updates automatically as you work.</p>' +
             '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">' +
@@ -658,7 +786,7 @@ const Components = {
             '</div>' +
             '<div class="form-row">' +
             '<div class="form-group half"><label>Password</label><input type="password" id="newUserPassword" name="newUserPassword" autocomplete="new-password" required></div>' +
-            '<div class="form-group half"><label>Role</label><select id="newUserRole"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>' +
+            '<div class="form-group half"><label>Role</label><select id="newUserRole"><option value="staff">Staff</option><option value="reviewer">Reviewer</option><option value="admin">Admin</option></select></div>' +
             '</div>' +
             '<button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create user</button>' +
             '</form>' +

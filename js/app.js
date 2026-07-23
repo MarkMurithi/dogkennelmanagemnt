@@ -7,11 +7,13 @@ const App = {
     currentDogViewFilters: { gender: '', search: '', sale: '' },
     selectedDogImageFiles: [],
     currentInvoiceEntryId: null,
+    navigationHistory: [],
 
     // ===== Initialize =====
     init() {
         KennelData.init();
         this.setupNavigation();
+        this.setupBrowserNavigation();
         
         this.setupDogForm();
         this.setupRecordForm();
@@ -24,6 +26,25 @@ const App = {
     },
 
     // ===== Navigation =====
+    setupBrowserNavigation() {
+        const initialState = window.history.state && window.history.state.page ? window.history.state.page : this.currentPage;
+        this.currentPage = initialState;
+        window.history.replaceState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
+
+        window.addEventListener('popstate', () => {
+            if (this.navigationHistory.length === 0) {
+                window.history.replaceState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
+                return;
+            }
+
+            const previousPage = this.navigationHistory.pop() || this.currentPage;
+            if (previousPage && previousPage !== this.currentPage) {
+                this.navigate(previousPage, { fromHistory: true });
+            } else {
+                window.history.replaceState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
+            }
+        });
+    },
     setupNavigation() {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
@@ -57,9 +78,22 @@ const App = {
     },
 
     navigate(page, options) {
+        const fromHistory = Boolean(options && options.fromHistory);
+
         if (!this.canAccessPage(page)) {
-            Components.toast('Staff users cannot access Finance or Settings.', 'error');
+            Components.toast('You do not have access to that page.', 'error');
             page = 'overview';
+        }
+
+        if (page === this.currentPage && !fromHistory) {
+            return;
+        }
+
+        if (!fromHistory && page !== this.currentPage) {
+            if (this.currentPage && this.currentPage !== page) {
+                this.navigationHistory.push(this.currentPage);
+            }
+            window.history.pushState({ page }, '', window.location.pathname + window.location.search);
         }
 
         this.currentPage = page;
@@ -88,6 +122,104 @@ const App = {
                 KennelData.loadUsers().catch(function() {});
                 KennelData.loadPendingApprovals().catch(function() {});
             }
+        }
+
+        if (this.currentPage === 'dailyreport') {
+            const form = document.getElementById('dailyReportForm');
+            const saveBtn = document.getElementById('dailyReportSave');
+            const addDogStatusBtn = document.getElementById('dailyReportAddDogStatus');
+            const statusList = document.getElementById('dailyReportStatusList');
+            const dogSelect = document.getElementById('dailyReportDogSelect');
+            const dogHealth = document.getElementById('dailyReportDogHealth');
+            const dogGrooming = document.getElementById('dailyReportDogGrooming');
+            let dogStatuses = [];
+
+            const renderStatusList = () => {
+                if (!statusList) return;
+                statusList.innerHTML = '';
+                if (dogStatuses.length === 0) {
+                    statusList.innerHTML = '<p style="color:var(--gray-500)">No dog statuses added yet.</p>';
+                    return;
+                }
+                dogStatuses.forEach((entry, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'detail-info-item';
+                    item.innerHTML = '<label>' + (entry.dogName || 'Dog') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' • Grooming: ' + (entry.groomingStatus || 'N/A') + ' <button type="button" class="btn-text-danger" data-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    statusList.appendChild(item);
+                });
+                statusList.querySelectorAll('button[data-index]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        dogStatuses.splice(Number(button.dataset.index), 1);
+                        renderStatusList();
+                    });
+                });
+            };
+
+            if (addDogStatusBtn) {
+                addDogStatusBtn.addEventListener('click', () => {
+                    if (!dogSelect || !dogSelect.value) {
+                        Components.toast('Please select a dog first.', 'error');
+                        return;
+                    }
+                    const label = dogSelect.options[dogSelect.selectedIndex]?.text || 'Dog';
+                    const healthValue = dogHealth ? dogHealth.value.trim() : '';
+                    const groomingValue = dogGrooming ? dogGrooming.value.trim() : '';
+                    if (!healthValue && !groomingValue) {
+                        Components.toast('Please add at least one status detail.', 'error');
+                        return;
+                    }
+                    dogStatuses.push({ dogId: dogSelect.value, dogName: label, healthStatus: healthValue, groomingStatus: groomingValue });
+                    dogHealth.value = '';
+                    dogGrooming.value = '';
+                    renderStatusList();
+                });
+            }
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    if (!form) return;
+                    const dateValue = document.getElementById('dailyReportDate').value;
+                    const foodRemainingValue = document.getElementById('dailyReportFoodRemaining').value;
+                    const foodTodayValue = document.getElementById('dailyReportFoodToday').value.trim();
+                    const kennelsWashedValue = document.getElementById('dailyReportKennelsWashed').checked;
+                    const visitorsValue = document.getElementById('dailyReportVisitors').value.trim();
+                    const personInChargeValue = document.getElementById('dailyReportPersonInCharge').value.trim();
+                    const medicationNotesValue = document.getElementById('dailyReportMedicationNotes').value.trim();
+                    const cleaningChecklistValue = document.getElementById('dailyReportCleaningChecklist').value.trim();
+                    const staffCommentsValue = document.getElementById('dailyReportStaffComments').value.trim();
+                    const notesValue = document.getElementById('dailyReportNotes').value.trim();
+                    if (!dateValue) {
+                        Components.toast('Please choose a report date.', 'error');
+                        return;
+                    }
+                    const payload = {
+                        date: dateValue,
+                        foodRemaining: foodRemainingValue,
+                        foodToday: foodTodayValue,
+                        kennelsWashed: kennelsWashedValue,
+                        dogStatuses: dogStatuses,
+                        visitors: visitorsValue,
+                        personInCharge: personInChargeValue,
+                        medicationNotes: medicationNotesValue,
+                        cleaningChecklist: cleaningChecklistValue,
+                        staffComments: staffCommentsValue,
+                        notes: notesValue
+                    };
+                    KennelData.addDailyReport(payload).then((result) => {
+                        if (!result || !result.ok) {
+                            Components.toast(result && result.error ? result.error : 'Unable to save report', 'error');
+                            return;
+                        }
+                        Components.toast('Daily report saved');
+                        form.reset();
+                        dogStatuses = [];
+                        renderStatusList();
+                        this.render();
+                    });
+                });
+            }
+
+            renderStatusList();
         }
 
         if (this.currentPage === 'puppies') {
@@ -227,10 +359,25 @@ const App = {
 
     canAccessPage(page) {
         const role = KennelData.getCurrentUserRole();
-        if (role === 'staff' && (page === 'finance' || page === 'settings')) {
+        if (page === 'settings' && role !== 'admin') {
+            return false;
+        }
+        if (page === 'finance' && role !== 'admin' && role !== 'reviewer') {
             return false;
         }
         return true;
+    },
+
+    updateNavigationVisibility() {
+        const role = KennelData.getCurrentUserRole();
+        const canAccessFinance = role === 'admin' || role === 'reviewer';
+        const canAccessSettings = role === 'admin';
+
+        document.querySelectorAll('.nav-item').forEach((item) => {
+            const page = item.dataset.page;
+            const shouldShow = page === 'finance' ? canAccessFinance : page === 'settings' ? canAccessSettings : true;
+            item.style.display = shouldShow ? '' : 'none';
+        });
     },
 
     editUser(userId) {
@@ -240,7 +387,7 @@ const App = {
         if (name === null) return;
         const email = window.prompt('Email', user.email || '');
         if (email === null) return;
-        const role = window.prompt('Role (admin or staff)', user.role || 'staff');
+        const role = window.prompt('Role (admin, reviewer, or staff)', user.role || 'staff');
         if (role === null) return;
         const active = window.confirm('Enable this account?');
         KennelData.updateUser(userId, {
@@ -449,6 +596,28 @@ const App = {
         }
     },
 
+    animateOverviewCounters() {
+        if (this.currentPage !== 'overview') return;
+        const counters = document.querySelectorAll('.overview-counter-value');
+        counters.forEach((counter, index) => {
+            const target = Number(counter.dataset.target || 0);
+            const duration = 800 + index * 120;
+            let startTime = null;
+
+            const step = (timestamp) => {
+                if (!startTime) startTime = timestamp;
+                const progress = Math.min(1, (timestamp - startTime) / duration);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                counter.textContent = Math.round(target * eased);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+
+            window.requestAnimationFrame(step);
+        });
+    },
+
     // ===== Render =====
     render() {
         const main = document.getElementById('mainContent');
@@ -469,6 +638,11 @@ const App = {
         if (authScreen) {
             authScreen.innerHTML = '';
         }
+
+        if (!this.canAccessPage(this.currentPage)) {
+            this.currentPage = 'overview';
+        }
+        this.updateNavigationVisibility();
 
         switch(this.currentPage) {
             case 'overview':
@@ -492,6 +666,9 @@ const App = {
             case 'calendar':
                 main.innerHTML = Components.calendarPage();
                 break;
+            case 'dailyreport':
+                main.innerHTML = Components.dailyReportPage();
+                break;
             case 'alerts':
                 main.innerHTML = Components.alertsPage();
                 break;
@@ -502,6 +679,7 @@ const App = {
                 main.innerHTML = Components.overviewPage();
         }
         this.setupPageInteractions();
+        this.animateOverviewCounters();
 
         // Update badge
         const badge = document.getElementById('totalDogsBadge');
@@ -731,6 +909,44 @@ const App = {
         link.remove();
         URL.revokeObjectURL(url);
         Components.toast('Backup exported successfully');
+        return payload;
+    },
+
+    exportDailyReports() {
+        const reports = KennelData.getDailyReports();
+        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,medicationNotes,cleaningChecklist,staffComments,notes,dogStatuses'];
+        reports.forEach((report) => {
+            const dogStatuses = (report.dogStatuses || []).map(function(item) {
+                return (item.dogName || 'Dog') + ': Health=' + (item.healthStatus || 'N/A') + '; Grooming=' + (item.groomingStatus || 'N/A');
+            }).join(' | ');
+            const row = [
+                (report.date || ''),
+                (report.foodRemaining || ''),
+                (report.foodToday || ''),
+                report.kennelsWashed ? 'Yes' : 'No',
+                (report.visitors || ''),
+                (report.personInCharge || ''),
+                (report.medicationNotes || ''),
+                (report.cleaningChecklist || ''),
+                (report.staffComments || ''),
+                (report.notes || ''),
+                dogStatuses
+            ].map(function(value) {
+                return '"' + String(value).replace(/"/g, '""') + '"';
+            }).join(',');
+            lines.push(row);
+        });
+        const payload = lines.join('\n');
+        const blob = new Blob([payload], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'bigpaw-daily-reports.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        Components.toast('Daily reports exported successfully');
         return payload;
     },
 
