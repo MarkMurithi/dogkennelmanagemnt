@@ -1106,6 +1106,27 @@ body.modal-open {
 
 .record-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: flex-start; }
 
+.calendar-upcoming-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.calendar-upcoming-item .alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.calendar-task-done-indicator {
+    margin-left: auto;
+    color: var(--success);
+    font-size: 1.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
 
 .record-empty i { font-size: 2rem; margin-bottom: 8px; display: block; }
 .record-empty p { font-size: 0.9rem; }

@@ -949,21 +949,27 @@ const Components = {
                 var dueDate = new Date(event.nextDue);
                 var dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                 var isDueToday = dueStart.getTime() === todayStart.getTime();
+                var isMarkedDone = Boolean(event.record && event.record.alertDismissedFor && event.record.alertDismissedFor === event.nextDue);
                 var dueLabel = isDueToday ? 'Due today' : ('Due ' + dueDate.toLocaleDateString());
                 var actionHtml = '';
-                if (isDueToday && event.record && event.record.id) {
+                if (isDueToday && event.record && event.record.id && !isMarkedDone) {
                     actionHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
                         '<button class="btn btn-sm btn-secondary" onclick="App.markCalendarUpcomingDone(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.nextDue + '\')">Done</button>' +
                         '<button class="btn btn-sm btn-secondary" onclick="App.postponeCalendarUpcoming(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.dueField + '\',\'' + event.nextDue + '\')">Postpone</button>' +
                         '</div>';
                 }
-                upcomingHtml += '<div class="alert-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                var doneTickHtml = isMarkedDone
+                    ? '<div class="calendar-task-done-indicator" title="Completed" aria-label="Task completed"><i class="fas fa-check-circle"></i></div>'
+                    : '';
+                upcomingHtml += '<div class="alert-item calendar-upcoming-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
                     '<div class="alert-content">' +
                     '<h4>' + event.dogName + '</h4>' +
                     '<p>' + event.type + ' • ' + (event.record.type || 'Upcoming task') + '</p>' +
                     '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + dueLabel + '</p>' +
                     actionHtml +
-                    '</div></div>';
+                    '</div>' +
+                    doneTickHtml +
+                    '</div>';
             }
         }
 

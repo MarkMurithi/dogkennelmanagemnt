@@ -1299,6 +1299,14 @@ const KennelData = {
                     if (!dueDate) return;
                     var due = new Date(dueDate);
                     var dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+                    var isDismissedForDue = Boolean(r.alertDismissedFor && r.alertDismissedFor === dueDate);
+                    var isDueToday = dueStart.getTime() === todayStart.getTime();
+
+                    // Keep completed items visible only on the due day; remove them from calendar afterward.
+                    if (isDismissedForDue && !isDueToday) {
+                        return;
+                    }
+
                     if (dueStart >= todayStart) {
                         upcomingEvents.push({ dogName: d.name, dogId: d.id, type: type, record: r, nextDue: dueDate, dueField: dueField });
                     }
