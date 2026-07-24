@@ -771,12 +771,7 @@ body.modal-open {
 }
 
 /* ===== Records Tabs ===== */
-.records-section {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
+.records-section { margin-top: 20px; }
 
 .records-tabs {
     display: flex;
@@ -809,22 +804,15 @@ body.modal-open {
 
 .records-tab-content { display: none; }
 .records-tab-content.active {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: min(52vh, 540px);
-    min-height: 0;
-    overflow: hidden;
+    display: block;
 }
 
-.records-tab-content.active .records-list {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: 100%;
+.records-list-scroll {
+    max-height: min(46vh, 440px);
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    padding-right: 4px;
+    padding: 0 4px 4px 0;
 }
 
 /* ===== Records List ===== */

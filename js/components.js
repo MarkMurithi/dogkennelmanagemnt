@@ -219,7 +219,7 @@ const Components = {
             '<button class="btn btn-primary btn-sm" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')">' +
             '<i class="fas fa-plus"></i> Add ' + label +
             '</button></div>' +
-            '<div class="records-list">' + items + '</div>';
+            '<div class="records-list-scroll"><div class="records-list">' + items + '</div></div>';
     },
 
     dailyHealthStatusList: function(dog) {
