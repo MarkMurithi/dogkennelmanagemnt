@@ -11,6 +11,8 @@ const KennelData = {
     _currentUser: null,
     _serverState: { status: 'online', message: '' },
     _listeners: [],
+    _pendingWrites: [],
+    _isFlushingPendingWrites: false,
     _DATA_VERSION: 12,
     apiBase: (function() {
         if (typeof window === 'undefined' || !window.location) {
@@ -33,6 +35,8 @@ const KennelData = {
     })(),
 
     init() {
+        this._loadPendingWrites();
+        this._attachConnectivityHandlers();
         const stored = localStorage.getItem('kennelpro_data');
         if (stored) {
             try {
@@ -61,6 +65,7 @@ const KennelData = {
             this._validateSession().then(function(isValid) {
                 if (isValid) {
                     this._syncFromServer();
+                    this._flushPendingWrites();
                 }
             }.bind(this));
             return;
@@ -101,9 +106,139 @@ const KennelData = {
     },
 
     _request(path, options) {
+        const method = String((options && options.method) || 'GET').toUpperCase();
+        const isWriteRequest = this._isQueueableWrite(path, method);
+        const queuedWriteId = options && options.__queuedWriteId ? options.__queuedWriteId : null;
+
         return this._requestWithMeta(path, options).then(function(result) {
+            if (result.ok && queuedWriteId) {
+                this._removePendingWrite(queuedWriteId);
+                if (this._pendingWrites.length === 0) {
+                    this._setServerState('online', '');
+                }
+            }
+
+            if (!result.ok && isWriteRequest && result.status === 0) {
+                if (!queuedWriteId) {
+                    this._enqueuePendingWrite(path, {
+                        method: method,
+                        body: options && options.body ? options.body : undefined
+                    });
+                }
+                this._setServerState('offline', 'Server unreachable. ' + this._pendingWrites.length + ' change(s) queued and will sync automatically once connection is restored.');
+                return Object.assign({}, result.data || {}, {
+                    ok: false,
+                    queued: true,
+                    error: 'Saved locally. Will sync automatically when the server is reachable.'
+                });
+            }
+
+            if (!result.ok && queuedWriteId && result.status >= 400 && result.status < 500) {
+                this._removePendingWrite(queuedWriteId);
+            }
+
             return result.data || {};
-        });
+        }.bind(this));
+    },
+
+    _isQueueableWrite(path, method) {
+        if (!method || ['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+            return false;
+        }
+        if (!path || path.indexOf('/auth/') === 0) {
+            return false;
+        }
+        return true;
+    },
+
+    _attachConnectivityHandlers() {
+        if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+            return;
+        }
+        if (this._connectivityHandlersAttached) {
+            return;
+        }
+        this._connectivityHandlersAttached = true;
+        window.addEventListener('online', function() {
+            this._flushPendingWrites();
+        }.bind(this));
+    },
+
+    _loadPendingWrites() {
+        try {
+            const raw = localStorage.getItem('kennelpro_pending_writes');
+            if (!raw) {
+                this._pendingWrites = [];
+                return;
+            }
+            const parsed = JSON.parse(raw);
+            this._pendingWrites = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            this._pendingWrites = [];
+        }
+    },
+
+    _savePendingWrites() {
+        try {
+            localStorage.setItem('kennelpro_pending_writes', JSON.stringify(this._pendingWrites));
+        } catch (e) {}
+    },
+
+    _enqueuePendingWrite(path, request) {
+        const entry = {
+            id: 'pw' + Date.now() + '-' + Math.floor(Math.random() * 1000000),
+            path: path,
+            method: request.method,
+            body: request.body,
+            createdAt: new Date().toISOString()
+        };
+        this._pendingWrites.push(entry);
+        this._savePendingWrites();
+        this._notify();
+        return entry.id;
+    },
+
+    _removePendingWrite(id) {
+        const before = this._pendingWrites.length;
+        this._pendingWrites = this._pendingWrites.filter(function(entry) { return entry.id !== id; });
+        if (this._pendingWrites.length !== before) {
+            this._savePendingWrites();
+            this._notify();
+        }
+    },
+
+    _flushPendingWrites() {
+        if (this._isFlushingPendingWrites || !this._pendingWrites.length) {
+            return Promise.resolve();
+        }
+
+        if (!this._getStoredToken()) {
+            return Promise.resolve();
+        }
+
+        this._isFlushingPendingWrites = true;
+        const entries = this._pendingWrites.slice();
+
+        let chain = Promise.resolve();
+        entries.forEach(function(entry) {
+            chain = chain.then(function() {
+                return this._request(entry.path, {
+                    method: entry.method,
+                    body: entry.body,
+                    __queuedWriteId: entry.id
+                });
+            }.bind(this));
+        }.bind(this));
+
+        return chain.then(function() {
+            if (this._pendingWrites.length === 0) {
+                this._setServerState('online', '');
+                return this._syncFromServer();
+            }
+            this._setServerState('offline', this._pendingWrites.length + ' change(s) are still queued and will retry automatically.');
+        }.bind(this)).finally(function() {
+            this._isFlushingPendingWrites = false;
+        }.bind(this));
     },
 
     _setServerState(status, message) {
