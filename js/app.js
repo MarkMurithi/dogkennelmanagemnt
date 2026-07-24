@@ -3,6 +3,7 @@ const App = {
     currentPage: 'overview',
     currentDogId: null,
     editingDogId: null,
+    editingPuppyId: null,
     editingRecord: null,
     currentDogViewFilters: { gender: '', search: '', sale: '' },
     selectedDogImageFiles: [],
@@ -225,6 +226,10 @@ const App = {
         if (this.currentPage === 'puppies') {
             const form = document.getElementById('puppyForm');
             if (form) {
+                const puppyIdInput = document.getElementById('puppyId');
+                const puppyFormTitle = document.getElementById('puppyFormTitle');
+                const puppySubmitBtn = document.getElementById('puppySubmitBtn');
+                const puppyCancelEditBtn = document.getElementById('puppyCancelEditBtn');
                 const saleStatus = document.getElementById('puppySaleStatus');
                 const saleAmountFields = document.getElementById('puppySaleAmountFields');
                 const togglePuppySaleFields = () => {
@@ -236,9 +241,45 @@ const App = {
                 saleStatus.addEventListener('change', togglePuppySaleFields);
                 togglePuppySaleFields();
 
+                const setPuppyFormMode = (editing) => {
+                    if (puppyFormTitle) {
+                        puppyFormTitle.innerHTML = editing ? '<i class="fas fa-edit"></i> Edit Puppy' : '<i class="fas fa-plus"></i> Add Puppy';
+                    }
+                    if (puppySubmitBtn) {
+                        puppySubmitBtn.innerHTML = editing ? '<i class="fas fa-save"></i> Save Changes' : '<i class="fas fa-plus"></i> Add Puppy';
+                    }
+                    if (puppyCancelEditBtn) {
+                        puppyCancelEditBtn.style.display = editing ? '' : 'none';
+                    }
+                };
+
+                const resetPuppyForm = () => {
+                    this.editingPuppyId = null;
+                    if (puppyIdInput) puppyIdInput.value = '';
+                    form.reset();
+                    if (saleStatus) saleStatus.value = 'Available';
+                    togglePuppySaleFields();
+                    setPuppyFormMode(false);
+                };
+
+                if (puppyCancelEditBtn) {
+                    puppyCancelEditBtn.onclick = () => resetPuppyForm();
+                }
+
+                if (this.editingPuppyId && puppyIdInput) {
+                    const existingPuppy = KennelData.getPuppies().find(function(item) { return item.id === this.editingPuppyId; }.bind(this));
+                    if (existingPuppy) {
+                        puppyIdInput.value = existingPuppy.id;
+                    }
+                    setPuppyFormMode(Boolean(existingPuppy));
+                } else {
+                    setPuppyFormMode(false);
+                }
+
                 form.onsubmit = (e) => {
                     e.preventDefault();
                     const saleStatusValue = document.getElementById('puppySaleStatus').value;
+                    const editingPuppyId = (puppyIdInput && puppyIdInput.value) ? puppyIdInput.value : this.editingPuppyId;
                     const puppyData = {
                         name: document.getElementById('puppyName').value.trim(),
                         dob: document.getElementById('puppyDob').value || null,
@@ -271,7 +312,8 @@ const App = {
                         return;
                     }
 
-                    KennelData.addPuppy(puppyData).then((result) => {
+                    const savePromise = editingPuppyId ? KennelData.updatePuppy(editingPuppyId, puppyData) : KennelData.addPuppy(puppyData);
+                    savePromise.then((result) => {
                         if (!result || !result.ok) {
                             Components.toast(result && result.error ? result.error : 'Unable to save puppy', 'error');
                             return;
@@ -279,29 +321,29 @@ const App = {
 
                         if (result.pending) {
                             Components.toast('Your puppy submission is pending admin approval.');
-                            form.reset();
+                            resetPuppyForm();
                             this.render();
                             return;
                         }
 
-                        const createdPuppy = result.puppy || puppyData;
-                        if (createdPuppy && ['Booked', 'Sold'].includes(createdPuppy.saleStatus) && (createdPuppy.saleTotalAmount || createdPuppy.saleReceivedAmount || createdPuppy.saleUnpaidAmount)) {
+                        const savedPuppy = result.puppy || puppyData;
+                        if (!editingPuppyId && savedPuppy && ['Booked', 'Sold'].includes(savedPuppy.saleStatus) && (savedPuppy.saleTotalAmount || savedPuppy.saleReceivedAmount || savedPuppy.saleUnpaidAmount)) {
                             const financeNotes = [];
-                            financeNotes.push('Sale status: ' + createdPuppy.saleStatus);
-                            if (createdPuppy.saleReceivedAmount !== null && createdPuppy.saleReceivedAmount !== undefined) {
-                                financeNotes.push('Received: KSh ' + Number(createdPuppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                            financeNotes.push('Sale status: ' + savedPuppy.saleStatus);
+                            if (savedPuppy.saleReceivedAmount !== null && savedPuppy.saleReceivedAmount !== undefined) {
+                                financeNotes.push('Received: KSh ' + Number(savedPuppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                             }
-                            if (createdPuppy.saleUnpaidAmount !== null && createdPuppy.saleUnpaidAmount !== undefined) {
-                                financeNotes.push('Unpaid: KSh ' + Number(createdPuppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                            if (savedPuppy.saleUnpaidAmount !== null && savedPuppy.saleUnpaidAmount !== undefined) {
+                                financeNotes.push('Unpaid: KSh ' + Number(savedPuppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                             }
 
                             const financeEntry = {
                                 type: 'sale',
-                                title: 'Puppy sale - ' + createdPuppy.name,
+                                title: 'Puppy sale - ' + savedPuppy.name,
                                 category: 'Puppy Sale',
-                                amount: Number(createdPuppy.saleTotalAmount) || 0,
+                                amount: Number(savedPuppy.saleTotalAmount) || 0,
                                 date: new Date().toISOString().slice(0, 10),
-                                related: createdPuppy.name,
+                                related: savedPuppy.name,
                                 notes: financeNotes.join(' • ')
                             };
                             KennelData.addFinanceEntry(financeEntry).then(function(financeResult) {
@@ -311,8 +353,8 @@ const App = {
                             });
                         }
 
-                        Components.toast(createdPuppy.name + ' added to the puppy list');
-                        form.reset();
+                        Components.toast(editingPuppyId ? (savedPuppy.name + ' updated successfully') : (savedPuppy.name + ' added to the puppy list'));
+                        resetPuppyForm();
                         this.render();
                     });
                 };
@@ -886,6 +928,80 @@ const App = {
         KennelData.deletePuppy(puppyId);
         Components.toast('Puppy removed from the list');
         this.render();
+    },
+
+    editPuppy(puppyId) {
+        const puppy = KennelData.getPuppies().find(function(item) { return item.id === puppyId; });
+        if (!puppy) {
+            Components.toast('Unable to find this puppy record.', 'error');
+            return;
+        }
+
+        this.editingPuppyId = puppyId;
+        this.currentPage = 'puppies';
+        this.render();
+
+        const vaccinations = (puppy.vaccinations && puppy.vaccinations[0]) ? puppy.vaccinations[0] : {};
+        const deworming = (puppy.deworming && puppy.deworming[0]) ? puppy.deworming[0] : {};
+
+        const puppyIdInput = document.getElementById('puppyId');
+        if (puppyIdInput) puppyIdInput.value = puppy.id || '';
+        const puppyName = document.getElementById('puppyName');
+        if (puppyName) puppyName.value = puppy.name || '';
+        const puppyDob = document.getElementById('puppyDob');
+        if (puppyDob) puppyDob.value = puppy.dob || '';
+        const puppyGender = document.getElementById('puppyGender');
+        if (puppyGender) puppyGender.value = puppy.gender || '';
+        const puppySaleStatus = document.getElementById('puppySaleStatus');
+        if (puppySaleStatus) puppySaleStatus.value = puppy.saleStatus || 'Available';
+        const puppyTotalSaleAmount = document.getElementById('puppyTotalSaleAmount');
+        if (puppyTotalSaleAmount) puppyTotalSaleAmount.value = (puppy.saleTotalAmount !== null && puppy.saleTotalAmount !== undefined) ? puppy.saleTotalAmount : '';
+        const puppyReceivedAmount = document.getElementById('puppyReceivedAmount');
+        if (puppyReceivedAmount) puppyReceivedAmount.value = (puppy.saleReceivedAmount !== null && puppy.saleReceivedAmount !== undefined) ? puppy.saleReceivedAmount : '';
+        const puppyUnpaidAmount = document.getElementById('puppyUnpaidAmount');
+        if (puppyUnpaidAmount) puppyUnpaidAmount.value = (puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== undefined) ? puppy.saleUnpaidAmount : '';
+        const puppyVaccinationDate = document.getElementById('puppyVaccinationDate');
+        if (puppyVaccinationDate) puppyVaccinationDate.value = vaccinations.date || '';
+        const puppyNextVaccination = document.getElementById('puppyNextVaccination');
+        if (puppyNextVaccination) puppyNextVaccination.value = vaccinations.nextDue || '';
+        const puppyDewormingDate = document.getElementById('puppyDewormingDate');
+        if (puppyDewormingDate) puppyDewormingDate.value = deworming.date || '';
+        const puppyNextDeworming = document.getElementById('puppyNextDeworming');
+        if (puppyNextDeworming) puppyNextDeworming.value = deworming.nextDue || '';
+        const puppyFather = document.getElementById('puppyFather');
+        if (puppyFather) puppyFather.value = puppy.father || '';
+        const puppyMother = document.getElementById('puppyMother');
+        if (puppyMother) puppyMother.value = puppy.mother || '';
+        const puppySireGrandfather = document.getElementById('puppySireGrandfather');
+        if (puppySireGrandfather) puppySireGrandfather.value = puppy.sireGrandfather || '';
+        const puppySireGrandmother = document.getElementById('puppySireGrandmother');
+        if (puppySireGrandmother) puppySireGrandmother.value = puppy.sireGrandmother || '';
+        const puppyDamGrandfather = document.getElementById('puppyDamGrandfather');
+        if (puppyDamGrandfather) puppyDamGrandfather.value = puppy.damGrandfather || '';
+        const puppyDamGrandmother = document.getElementById('puppyDamGrandmother');
+        if (puppyDamGrandmother) puppyDamGrandmother.value = puppy.damGrandmother || '';
+        const puppyOwnerName = document.getElementById('puppyOwnerName');
+        if (puppyOwnerName) puppyOwnerName.value = puppy.ownerName || '';
+        const puppyOwnerPhone = document.getElementById('puppyOwnerPhone');
+        if (puppyOwnerPhone) puppyOwnerPhone.value = puppy.ownerPhone || '';
+        const puppyOwnerAddress = document.getElementById('puppyOwnerAddress');
+        if (puppyOwnerAddress) puppyOwnerAddress.value = puppy.ownerAddress || '';
+
+        if (puppySaleStatus) {
+            puppySaleStatus.dispatchEvent(new Event('change'));
+        }
+
+        const puppyFormTitle = document.getElementById('puppyFormTitle');
+        if (puppyFormTitle) puppyFormTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Puppy';
+        const puppySubmitBtn = document.getElementById('puppySubmitBtn');
+        if (puppySubmitBtn) puppySubmitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        const puppyCancelEditBtn = document.getElementById('puppyCancelEditBtn');
+        if (puppyCancelEditBtn) puppyCancelEditBtn.style.display = '';
+
+        const form = document.getElementById('puppyForm');
+        if (form) {
+            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     },
 
     deleteFinanceEntry(entryId) {

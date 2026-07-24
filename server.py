@@ -1259,16 +1259,66 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "puppy": {**payload, **created}})
             return
 
-        if path.startswith("/api/puppies/") and method == "DELETE":
+        if path.startswith("/api/puppies/") and method in {"PUT", "DELETE"}:
             user = self._require_auth()
             if not user:
                 return
             puppy_id = path.split("/", 3)[3]
+            if method == "PUT":
+                if user.get("role") == "staff":
+                    self._send_json(403, {"ok": False, "error": "Access denied."})
+                    return
+                payload = self._parse_json(body)
+                name = str(payload.get("name", "")).strip()
+                gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+                if not name:
+                    self._send_json(400, {"ok": False, "error": "A puppy name is required."})
+                    return
+                if not gender:
+                    self._send_json(400, {"ok": False, "error": "Please choose a gender for the puppy."})
+                    return
+                conn = self._connect()
+                duplicate = conn.execute("SELECT id FROM puppies WHERE LOWER(name)=? AND id!=?", (name.lower(), puppy_id)).fetchone()
+                if duplicate:
+                    conn.close()
+                    self._send_json(409, {"ok": False, "error": "A puppy with this name already exists."})
+                    return
+                conn.execute(
+                    "UPDATE puppies SET name=?, dob=?, gender=?, saleStatus=?, saleTotalAmount=?, saleReceivedAmount=?, saleUnpaidAmount=?, vaccinations=?, deworming=?, father=?, mother=?, sireGrandfather=?, sireGrandmother=?, damGrandfather=?, damGrandmother=?, ownerName=?, ownerPhone=?, ownerAddress=? WHERE id=?",
+                    (
+                        name,
+                        payload.get("dob"),
+                        gender,
+                        payload.get("saleStatus", "Available"),
+                        payload.get("saleTotalAmount"),
+                        payload.get("saleReceivedAmount"),
+                        payload.get("saleUnpaidAmount"),
+                        json.dumps(payload.get("vaccinations") or []),
+                        json.dumps(payload.get("deworming") or []),
+                        payload.get("father", ""),
+                        payload.get("mother", ""),
+                        payload.get("sireGrandfather", ""),
+                        payload.get("sireGrandmother", ""),
+                        payload.get("damGrandfather", ""),
+                        payload.get("damGrandmother", ""),
+                        payload.get("ownerName", ""),
+                        payload.get("ownerPhone", ""),
+                        payload.get("ownerAddress", ""),
+                        puppy_id,
+                    ),
+                )
+                conn.commit()
+                conn.close()
+                self._create_backup(label="Auto-export", source="auto")
+                self._log_audit(user, "update_puppy", puppy_id, f"Updated puppy {name}")
+                self._send_json(200, {"ok": True, "puppy": {**payload, "id": puppy_id, "name": name, "gender": gender}})
+                return
             conn = self._connect()
             conn.execute("DELETE FROM puppies WHERE id = ?", (puppy_id,))
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
+            self._log_audit(user, "delete_puppy", puppy_id, f"Deleted puppy {puppy_id}")
             self._send_json(200, {"ok": True})
             return
 

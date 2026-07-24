@@ -330,11 +330,33 @@ const KennelData = {
 
     updatePuppy(id, updates) {
         var idx = this._puppies.findIndex(function(p) { return p.id === id; });
-        if (idx === -1) return null;
+        if (idx === -1) return Promise.resolve({ ok: false, error: 'Puppy not found.' });
+        const previous = this._puppies[idx];
         this._puppies[idx] = Object.assign({}, this._puppies[idx], updates);
         this._save();
         this._notify();
-        return this._puppies[idx];
+        return this._request('/puppies/' + id, {
+            method: 'PUT',
+            body: JSON.stringify(this._puppies[idx])
+        }).then(function(result) {
+            if (!result || !result.ok) {
+                this._puppies[idx] = previous;
+                this._save();
+                this._notify();
+                return result;
+            }
+            if (result.puppy) {
+                this._puppies[idx] = Object.assign({}, this._puppies[idx], result.puppy);
+                this._save();
+                this._notify();
+            }
+            return result;
+        }.bind(this)).catch(function() {
+            this._puppies[idx] = previous;
+            this._save();
+            this._notify();
+            return { ok: false, error: 'Unable to update puppy right now.' };
+        }.bind(this));
     },
 
     deletePuppy(id) {

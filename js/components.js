@@ -828,7 +828,7 @@ const Components = {
                 var saleAmountText = (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold') ? '<div class="detail-info-item"><label>Total Sale Amount</label><p>' + (puppy.saleTotalAmount !== undefined && puppy.saleTotalAmount !== null && puppy.saleTotalAmount !== '' ? 'KSh ' + Number(puppy.saleTotalAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' + '<div class="detail-info-item"><label>Received Amount</label><p>' + (puppy.saleReceivedAmount !== undefined && puppy.saleReceivedAmount !== null && puppy.saleReceivedAmount !== '' ? 'KSh ' + Number(puppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' + '<div class="detail-info-item"><label>Unpaid Amount</label><p>' + (puppy.saleUnpaidAmount !== undefined && puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== '' ? 'KSh ' + Number(puppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' : '';
 
                 puppyCardsHtml += '<div class="card section-card">' +
-                    '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div>' +
+                    '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3><div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary" onclick="App.editPuppy(\'' + puppy.id + '\')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
                     '<div class="card-body">' +
                     '<div class="detail-info-grid">' +
                     '<div class="detail-info-item"><label>Date of Birth</label><p>' + (puppy.dob ? new Date(puppy.dob).toLocaleDateString() : 'N/A') + '</p></div>' +
@@ -858,9 +858,10 @@ const Components = {
             '</section>' +
             '<div class="section-header"><h2><i class="fas fa-paw"></i> Puppies</h2><div class="section-badge"><i class="fas fa-plus-circle"></i> Add new litter</div></div>' +
             '<div class="card section-card" style="margin-bottom:24px">' +
-            '<div class="card-header"><h3><i class="fas fa-plus"></i> Add Puppy</h3></div>' +
+            '<div class="card-header"><h3 id="puppyFormTitle"><i class="fas fa-plus"></i> Add Puppy</h3></div>' +
             '<div class="card-body">' +
             '<form id="puppyForm" class="modern-form">' +
+            '<input type="hidden" id="puppyId" value="">' +
             '<div class="form-row">' +
             '<div class="form-group half"><label for="puppyName">Name *</label><input type="text" id="puppyName" required></div>' +
             '<div class="form-group half"><label for="puppyDob">Date of Birth</label><input type="date" id="puppyDob"></div>' +
@@ -899,7 +900,7 @@ const Components = {
             '<div class="form-group half"><label for="puppyOwnerPhone">Phone Number</label><input type="tel" id="puppyOwnerPhone" placeholder="Phone number"></div>' +
             '</div>' +
             '<div class="form-group"><label for="puppyOwnerAddress">Address</label><input type="text" id="puppyOwnerAddress" placeholder="Owner address"></div>' +
-            '<button class="btn btn-primary" type="submit"><i class="fas fa-plus"></i> Add Puppy</button>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="puppySubmitBtn" type="submit"><i class="fas fa-plus"></i> Add Puppy</button><button class="btn btn-secondary" id="puppyCancelEditBtn" type="button" style="display:none"><i class="fas fa-times"></i> Cancel Edit</button></div>' +
             '</form></div></div>' +
             '<div class="section-header"><h2><i class="fas fa-list"></i> Puppy Records</h2></div>' +
             '<div class="content-grid">' + puppyCardsHtml + '</div></div>';
