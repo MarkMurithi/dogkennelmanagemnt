@@ -1021,8 +1021,7 @@ const App = {
         const existing = document.getElementById('dogDetailOverlay');
         if (existing) existing.remove();
 
-        const main = document.getElementById('mainContent');
-        main.insertAdjacentHTML('beforeend', Components.dogDetailPanel(dog));
+        document.body.insertAdjacentHTML('beforeend', Components.dogDetailPanel(dog));
         document.body.classList.add('modal-open');
 
         this.setupDetailTabs();
