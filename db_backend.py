@@ -78,6 +78,9 @@ class DBConnection:
     def commit(self):
         self._native_connection.commit()
 
+    def rollback(self):
+        self._native_connection.rollback()
+
     def close(self):
         self._native_connection.close()
 

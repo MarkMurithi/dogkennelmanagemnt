@@ -59,6 +59,7 @@ def init_db():
         conn.execute("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1")
     except Exception as exc:
         # SQLite/Postgres differ in error classes for duplicate columns; ignore this safe migration case.
+        conn.rollback()
         if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
             raise
     conn.execute(
