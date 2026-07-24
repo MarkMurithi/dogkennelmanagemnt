@@ -89,6 +89,9 @@ class BackupTests(unittest.TestCase):
             "dogs": [
                 {"id": "d-import-1", "name": "Bella", "breed": "Beagle", "gender": "Female", "records": {}, "attachments": [], "createdAt": "2026-07-24T09:00:00Z"}
             ],
+            "puppies": [
+                {"id": "p-import-1", "name": "Tiny", "dob": "2026-07-01", "gender": "Female", "collarColor": "Red", "saleStatus": "Available", "vaccinations": [], "deworming": [], "createdAt": "2026-07-24T09:05:00Z"}
+            ],
             "dailyReports": [
                 {"id": "dr-import-1", "date": "2026-07-24", "foodRemaining": "2 bags", "foodToday": "1 bag", "kennelsWashed": True, "dogStatuses": [], "visitors": "0", "personInCharge": "Jane", "medicationNotes": "", "cleaningChecklist": "Done", "staffComments": "All good", "notes": "Imported report", "createdAt": "2026-07-24T09:10:00Z"}
             ],
@@ -101,6 +104,9 @@ class BackupTests(unittest.TestCase):
 
         dogs = self._request_json("/api/dogs", None, method="GET", token=self._admin_token())
         self.assertTrue(any(item.get("name") == "Bella" for item in dogs), dogs)
+
+        puppies = self._request_json("/api/puppies", None, method="GET", token=self._admin_token())
+        self.assertTrue(any(item.get("name") == "Tiny" and item.get("collarColor") == "Red" for item in puppies), puppies)
 
         reports = self._request_json("/api/daily-reports", None, method="GET", token=self._admin_token())
         self.assertTrue(any(item.get("personInCharge") == "Jane" for item in reports), reports)

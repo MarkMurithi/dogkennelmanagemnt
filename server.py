@@ -102,6 +102,7 @@ def init_db():
             name TEXT NOT NULL,
             dob TEXT,
             gender TEXT,
+            collarColor TEXT,
             saleStatus TEXT,
             saleTotalAmount REAL,
             saleReceivedAmount REAL,
@@ -121,6 +122,14 @@ def init_db():
         )
         """
     )
+    conn.commit()
+    try:
+        conn.execute("ALTER TABLE puppies ADD COLUMN collarColor TEXT")
+    except Exception as exc:
+        # SQLite/Postgres differ in duplicate-column error classes; ignore when the column already exists.
+        conn.rollback()
+        if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
+            raise
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS finance (
@@ -284,12 +293,13 @@ def restore_backup_payload(payload):
         )
     for puppy in payload.get("puppies", []):
         conn.execute(
-            "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO puppies (id, name, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 puppy.get("id") or "p" + str(int(__import__("time").time() * 1000)),
                 puppy.get("name", ""),
                 puppy.get("dob"),
                 puppy.get("gender", "Unknown"),
+                puppy.get("collarColor", ""),
                 puppy.get("saleStatus", "Available"),
                 puppy.get("saleTotalAmount"),
                 puppy.get("saleReceivedAmount"),
@@ -572,6 +582,7 @@ class KennelHandler(BaseHTTPRequestHandler):
     def _insert_puppy_record(self, payload):
         name = str(payload.get("name", "")).strip()
         gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+        collar_color = str(payload.get("collarColor", "")).strip()
         if not name:
             raise ValueError("A puppy name is required.")
         if not gender:
@@ -583,12 +594,13 @@ class KennelHandler(BaseHTTPRequestHandler):
             raise ValueError("A puppy with this name already exists.")
         puppy_id = payload.get("id") or "p" + str(int(__import__("time").time() * 1000))
         conn.execute(
-            "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO puppies (id, name, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 puppy_id,
                 name,
                 payload.get("dob"),
                 gender,
+                collar_color,
                 payload.get("saleStatus", "Available"),
                 payload.get("saleTotalAmount"),
                 payload.get("saleReceivedAmount"),
@@ -609,7 +621,7 @@ class KennelHandler(BaseHTTPRequestHandler):
         )
         conn.commit()
         conn.close()
-        return {"id": puppy_id, "name": name, "gender": gender}
+        return {"id": puppy_id, "name": name, "gender": gender, "collarColor": collar_color}
 
     def _insert_finance_record(self, payload):
         title = str(payload.get("title", "")).strip()
@@ -686,24 +698,25 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "name": row[1],
                     "dob": row[2],
                     "gender": row[3],
-                    "saleStatus": row[4],
-                    "saleTotalAmount": row[5],
-                    "saleReceivedAmount": row[6],
-                    "saleUnpaidAmount": row[7],
-                    "vaccinations": json.loads(row[8]) if row[8] else [],
-                    "deworming": json.loads(row[9]) if row[9] else [],
-                    "father": row[10],
-                    "mother": row[11],
-                    "sireGrandfather": row[12],
-                    "sireGrandmother": row[13],
-                    "damGrandfather": row[14],
-                    "damGrandmother": row[15],
-                    "ownerName": row[16],
-                    "ownerPhone": row[17],
-                    "ownerAddress": row[18],
-                    "createdAt": row[19],
+                    "collarColor": row[4],
+                    "saleStatus": row[5],
+                    "saleTotalAmount": row[6],
+                    "saleReceivedAmount": row[7],
+                    "saleUnpaidAmount": row[8],
+                    "vaccinations": json.loads(row[9]) if row[9] else [],
+                    "deworming": json.loads(row[10]) if row[10] else [],
+                    "father": row[11],
+                    "mother": row[12],
+                    "sireGrandfather": row[13],
+                    "sireGrandmother": row[14],
+                    "damGrandfather": row[15],
+                    "damGrandmother": row[16],
+                    "ownerName": row[17],
+                    "ownerPhone": row[18],
+                    "ownerAddress": row[19],
+                    "createdAt": row[20],
                 }
-                for row in self._fetch_all("SELECT id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt FROM puppies ORDER BY createdAt DESC")
+                for row in self._fetch_all("SELECT id, name, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt FROM puppies ORDER BY createdAt DESC")
             ],
             "finance": [
                 {"id": row[0], "type": row[1], "title": row[2], "category": row[3], "amount": row[4], "date": row[5], "related": row[6], "notes": row[7], "createdAt": row[8]}
@@ -1222,7 +1235,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            rows = self._fetch_all("SELECT * FROM puppies ORDER BY createdAt DESC")
+            rows = self._fetch_all("SELECT id, name, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt FROM puppies ORDER BY createdAt DESC")
             payload = []
             for row in rows:
                 payload.append({
@@ -1230,22 +1243,23 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "name": row[1],
                     "dob": row[2],
                     "gender": row[3],
-                    "saleStatus": row[4],
-                    "saleTotalAmount": row[5],
-                    "saleReceivedAmount": row[6],
-                    "saleUnpaidAmount": row[7],
-                    "vaccinations": json.loads(row[8]) if row[8] else [],
-                    "deworming": json.loads(row[9]) if row[9] else [],
-                    "father": row[10],
-                    "mother": row[11],
-                    "sireGrandfather": row[12],
-                    "sireGrandmother": row[13],
-                    "damGrandfather": row[14],
-                    "damGrandmother": row[15],
-                    "ownerName": row[16],
-                    "ownerPhone": row[17],
-                    "ownerAddress": row[18],
-                    "createdAt": row[19],
+                    "collarColor": row[4],
+                    "saleStatus": row[5],
+                    "saleTotalAmount": row[6],
+                    "saleReceivedAmount": row[7],
+                    "saleUnpaidAmount": row[8],
+                    "vaccinations": json.loads(row[9]) if row[9] else [],
+                    "deworming": json.loads(row[10]) if row[10] else [],
+                    "father": row[11],
+                    "mother": row[12],
+                    "sireGrandfather": row[13],
+                    "sireGrandmother": row[14],
+                    "damGrandfather": row[15],
+                    "damGrandmother": row[16],
+                    "ownerName": row[17],
+                    "ownerPhone": row[18],
+                    "ownerAddress": row[19],
+                    "createdAt": row[20],
                 })
             self._send_json(200, payload)
             return
@@ -1282,6 +1296,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 payload = self._parse_json(body)
                 name = str(payload.get("name", "")).strip()
                 gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+                collar_color = str(payload.get("collarColor", "")).strip()
                 if not name:
                     self._send_json(400, {"ok": False, "error": "A puppy name is required."})
                     return
@@ -1295,11 +1310,12 @@ class KennelHandler(BaseHTTPRequestHandler):
                     self._send_json(409, {"ok": False, "error": "A puppy with this name already exists."})
                     return
                 conn.execute(
-                    "UPDATE puppies SET name=?, dob=?, gender=?, saleStatus=?, saleTotalAmount=?, saleReceivedAmount=?, saleUnpaidAmount=?, vaccinations=?, deworming=?, father=?, mother=?, sireGrandfather=?, sireGrandmother=?, damGrandfather=?, damGrandmother=?, ownerName=?, ownerPhone=?, ownerAddress=? WHERE id=?",
+                    "UPDATE puppies SET name=?, dob=?, gender=?, collarColor=?, saleStatus=?, saleTotalAmount=?, saleReceivedAmount=?, saleUnpaidAmount=?, vaccinations=?, deworming=?, father=?, mother=?, sireGrandfather=?, sireGrandmother=?, damGrandfather=?, damGrandmother=?, ownerName=?, ownerPhone=?, ownerAddress=? WHERE id=?",
                     (
                         name,
                         payload.get("dob"),
                         gender,
+                        collar_color,
                         payload.get("saleStatus", "Available"),
                         payload.get("saleTotalAmount"),
                         payload.get("saleReceivedAmount"),

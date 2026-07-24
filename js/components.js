@@ -878,6 +878,7 @@ const Components = {
                     '<div class="detail-info-item"><label>Name</label><p>' + (puppy.name || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Date of Birth</label><p>' + (puppy.dob ? new Date(puppy.dob).toLocaleDateString() : 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Gender</label><p>' + (puppy.gender || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Collar Colour</label><p>' + (puppy.collarColor || 'N/A') + '</p></div>' +
                     '</div></section>' +
                     '<section class="puppy-profile-section">' +
                     '<h4><i class="fas fa-dna"></i> Pedigree</h4>' +
@@ -925,6 +926,9 @@ const Components = {
             '<div class="form-row">' +
             '<div class="form-group half"><label for="puppyGender">Gender *</label><select id="puppyGender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>' +
             '<div class="form-group half"><label for="puppySaleStatus">Sale Status</label><select id="puppySaleStatus"><option value="Available">Available</option><option value="Booked">Booked</option><option value="Sold">Sold</option></select></div>' +
+            '</div>' +
+            '<div class="form-row">' +
+            '<div class="form-group half"><label for="puppyCollarColor">Collar Colour</label><input type="text" id="puppyCollarColor" placeholder="e.g. Red"></div>' +
             '</div>' +
             '<div class="form-row" id="puppySaleAmountFields" style="display:none">' +
             '<div class="form-group half"><label for="puppyTotalSaleAmount">Total Sale Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyTotalSaleAmount" placeholder="250000"></div>' +

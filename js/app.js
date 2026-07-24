@@ -332,6 +332,7 @@ const App = {
                         name: document.getElementById('puppyName').value.trim(),
                         dob: document.getElementById('puppyDob').value || null,
                         gender: document.getElementById('puppyGender').value,
+                        collarColor: document.getElementById('puppyCollarColor').value.trim(),
                         saleStatus: saleStatusValue,
                         saleTotalAmount: ['Booked', 'Sold'].includes(saleStatusValue) ? parseFloat(document.getElementById('puppyTotalSaleAmount').value) || null : null,
                         saleReceivedAmount: ['Booked', 'Sold'].includes(saleStatusValue) ? parseFloat(document.getElementById('puppyReceivedAmount').value) || null : null,
@@ -1000,6 +1001,8 @@ const App = {
         if (puppyDob) puppyDob.value = puppy.dob || '';
         const puppyGender = document.getElementById('puppyGender');
         if (puppyGender) puppyGender.value = puppy.gender || '';
+        const puppyCollarColor = document.getElementById('puppyCollarColor');
+        if (puppyCollarColor) puppyCollarColor.value = puppy.collarColor || '';
         const puppySaleStatus = document.getElementById('puppySaleStatus');
         if (puppySaleStatus) puppySaleStatus.value = puppy.saleStatus || 'Available';
         const puppyTotalSaleAmount = document.getElementById('puppyTotalSaleAmount');
