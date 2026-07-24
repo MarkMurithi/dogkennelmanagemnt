@@ -82,6 +82,10 @@ const App = {
     navigate(page, options) {
         const fromHistory = Boolean(options && options.fromHistory);
 
+        if (page !== this.currentPage && document.getElementById('dogDetailOverlay')) {
+            this.closeDogDetail();
+        }
+
         if (!this.canAccessPage(page)) {
             Components.toast('You do not have access to that page.', 'error');
             page = 'overview';
@@ -742,6 +746,9 @@ const App = {
         const main = document.getElementById('mainContent');
         const authScreen = document.getElementById('authScreen');
         const serverState = KennelData.getServerState();
+        if (!document.getElementById('dogDetailOverlay')) {
+            document.body.classList.remove('modal-open');
+        }
         document.body.classList.toggle('auth-active', !KennelData.isAuthenticated());
 
         if (!KennelData.isAuthenticated()) {

@@ -601,11 +601,10 @@ img { max-width: 100%; height: auto; display: block; }
     z-index: 2000;
     overflow: hidden;
     padding: 12px;
-    display: flex;
     align-items: flex-start;
     justify-content: center;
     overscroll-behavior: contain;
-    touch-action: none;
+    touch-action: pan-y;
 }
 
 .dog-detail-overlay.open { display: flex; }
@@ -1957,6 +1956,38 @@ body.modal-open {
 
 @media (max-width: 640px) {
     .dog-grid { grid-template-columns: 1fr; }
+    .dog-card {
+        border-radius: 20px;
+        box-shadow: 0 10px 22px rgba(23, 19, 13, 0.08);
+    }
+    .dog-card-image-frame {
+        width: calc(100% - 16px);
+        margin: 8px 8px 0;
+        height: 210px;
+        border-radius: 14px;
+    }
+    .dog-card-body {
+        padding: 14px 14px 12px;
+    }
+    .dog-card-name {
+        font-size: 1.05rem;
+        line-height: 1.35;
+    }
+    .dog-card-breed {
+        font-size: 0.84rem;
+    }
+    .dog-card-tags {
+        gap: 8px;
+    }
+    .dog-card-tags .tag {
+        font-size: 0.74rem;
+        padding: 4px 10px;
+    }
+    .dog-card-footer {
+        padding: 10px 14px 14px;
+        font-size: 0.78rem;
+        background: rgba(246, 237, 215, 0.35);
+    }
     .page-hero { padding: 18px 16px; }
     .page-hero h2 { font-size: 1.25rem; }
     .page-hero p { font-size: 0.95rem; }
