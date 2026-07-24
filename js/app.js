@@ -7,6 +7,7 @@ const App = {
     editingRecord: null,
     currentDogViewFilters: { gender: '', search: '', sale: '' },
     selectedDogImageFiles: [],
+    selectedDogPedigreeCertificate: null,
     currentInvoiceEntryId: null,
     pendingDailyReportDogId: null,
     navigationHistory: [],
@@ -889,8 +890,17 @@ const App = {
         document.getElementById('dogId').value = '';
         document.getElementById('forSalePriceRow').style.display = 'none';
         this.selectedDogImageFiles = [];
+        this.selectedDogPedigreeCertificate = null;
         const uploadLabel = document.getElementById('dogImageUploadLabel');
         if (uploadLabel) uploadLabel.textContent = 'Choose image files';
+        const certificateLabel = document.getElementById('dogPedigreeCertificateLabel');
+        if (certificateLabel) certificateLabel.textContent = 'Choose a certificate file';
+        const certificateInput = document.getElementById('dogPedigreeCertificate');
+        if (certificateInput) certificateInput.value = '';
+        const certificateData = document.getElementById('dogPedigreeCertificateData');
+        if (certificateData) certificateData.value = '';
+        const certificateName = document.getElementById('dogPedigreeCertificateName');
+        if (certificateName) certificateName.value = '';
         document.getElementById('dogModal').classList.add('open');
     },
 
@@ -913,6 +923,18 @@ const App = {
         document.getElementById('dogOwnerPhone').value = dog.ownerPhone || '';
         document.getElementById('dogOwnerAddress').value = dog.ownerAddress || '';
         document.getElementById('dogPedigreeNotes').value = dog.pedigreeNotes || '';
+        this.selectedDogImageFiles = [];
+        this.selectedDogPedigreeCertificate = null;
+        const uploadLabel = document.getElementById('dogImageUploadLabel');
+        if (uploadLabel) uploadLabel.textContent = 'Choose image files';
+        const certificateInput = document.getElementById('dogPedigreeCertificate');
+        if (certificateInput) certificateInput.value = '';
+        document.getElementById('dogPedigreeCertificateData').value = dog.pedigreeCertificate || '';
+        document.getElementById('dogPedigreeCertificateName').value = dog.pedigreeCertificateName || '';
+        const certificateLabel = document.getElementById('dogPedigreeCertificateLabel');
+        if (certificateLabel) {
+            certificateLabel.textContent = dog.pedigreeCertificateName ? ('Existing certificate: ' + dog.pedigreeCertificateName) : 'Choose a certificate file';
+        }
         document.getElementById('dogStatus').value = dog.status || 'Active';
         document.getElementById('dogForSale').checked = dog.forSale || false;
         document.getElementById('dogValue').value = dog.value || '';
@@ -937,6 +959,14 @@ const App = {
             }
         });
 
+        document.getElementById('dogPedigreeCertificate').addEventListener('change', (event) => {
+            this.selectedDogPedigreeCertificate = (event.target.files && event.target.files[0]) ? event.target.files[0] : null;
+            const label = document.getElementById('dogPedigreeCertificateLabel');
+            if (label) {
+                label.textContent = this.selectedDogPedigreeCertificate ? this.selectedDogPedigreeCertificate.name : 'Choose a certificate file';
+            }
+        });
+
         document.getElementById('dogModalSave').addEventListener('click', () => {
             const form = document.getElementById('dogForm');
             if (!form.checkValidity()) {
@@ -944,7 +974,7 @@ const App = {
                 return;
             }
 
-            const saveDog = (imageValue, attachments) => {
+            const saveDog = (imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue) => {
                 const dogData = {
                     name: document.getElementById('dogName').value.trim(),
                     breed: document.getElementById('dogBreed').value.trim(),
@@ -958,6 +988,8 @@ const App = {
                     ownerPhone: document.getElementById('dogOwnerPhone').value.trim(),
                     ownerAddress: document.getElementById('dogOwnerAddress').value.trim(),
                     pedigreeNotes: document.getElementById('dogPedigreeNotes').value.trim(),
+                    pedigreeCertificate: pedigreeCertificateValue || document.getElementById('dogPedigreeCertificateData').value || '',
+                    pedigreeCertificateName: pedigreeCertificateNameValue || document.getElementById('dogPedigreeCertificateName').value || '',
                     status: document.getElementById('dogStatus').value,
                     forSale: document.getElementById('dogForSale').checked,
                     value: parseFloat(document.getElementById('dogValue').value) || null,
@@ -985,6 +1017,10 @@ const App = {
                 });
             };
 
+                const finalizeSave = (imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue) => {
+                    saveDog(imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue);
+                };
+
             if (this.selectedDogImageFiles.length > 0) {
                 const attachments = [];
                 let done = 0;
@@ -994,13 +1030,27 @@ const App = {
                         attachments.push(reader.result);
                         done += 1;
                         if (done === this.selectedDogImageFiles.length) {
-                            saveDog(attachments[0], attachments);
+                            const pedigreeFile = this.selectedDogPedigreeCertificate;
+                            if (pedigreeFile) {
+                                const certificateReader = new FileReader();
+                                certificateReader.onload = () => finalizeSave(attachments[0], attachments, certificateReader.result, pedigreeFile.name);
+                                certificateReader.readAsDataURL(pedigreeFile);
+                            } else {
+                                finalizeSave(attachments[0], attachments);
+                            }
                         }
                     };
                     reader.readAsDataURL(file);
                 });
             } else {
-                saveDog(document.getElementById('dogImage').value.trim(), []);
+                const pedigreeFile = this.selectedDogPedigreeCertificate;
+                if (pedigreeFile) {
+                    const certificateReader = new FileReader();
+                    certificateReader.onload = () => saveDog(document.getElementById('dogImage').value.trim(), [], certificateReader.result, pedigreeFile.name);
+                    certificateReader.readAsDataURL(pedigreeFile);
+                } else {
+                    saveDog(document.getElementById('dogImage').value.trim(), []);
+                }
             }
         });
 

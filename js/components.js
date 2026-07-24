@@ -284,6 +284,7 @@ const Components = {
         var safeDogOwnerPhone = safe(dog.ownerPhone || 'N/A');
         var safeDogOwnerAddress = safe(dog.ownerAddress || 'N/A');
         var safeDogPedigreeNotes = safe(dog.pedigreeNotes || 'Not recorded for this dog yet');
+        var safeDogPedigreeCertificateName = safe(dog.pedigreeCertificateName || 'Pedigree certificate');
         var age = dog.dob ? this.calculateAge(dog.dob) : 'Unknown';
         var genderIcon = dog.gender === 'Male' ? 'fa-mars' : 'fa-venus';
         var statusValue = dog.status || 'Active';
@@ -410,6 +411,13 @@ const Components = {
                 fieldItem('Owner contact', safeDogOwnerPhone) +
                 fieldItem('Owner address', safeDogOwnerAddress) +
                 fieldItem('Pedigree notes', safeDogPedigreeNotes) +
+            '</div>' +
+            '<div class="profile-certificate-block">' +
+                (dog.pedigreeCertificate ? (
+                    String(dog.pedigreeCertificate).indexOf('data:image/') === 0
+                        ? '<div class="profile-certificate-preview"><img src="' + safe(dog.pedigreeCertificate) + '" alt="' + safeDogPedigreeCertificateName + '" class="pedigree-certificate-image"></div>'
+                        : '<div class="profile-certificate-preview"><a class="btn btn-sm" href="' + safe(dog.pedigreeCertificate) + '" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-alt"></i> Open certificate</a><span class="profile-certificate-name">' + safeDogPedigreeCertificateName + '</span></div>'
+                ) : '<div class="profile-empty-state">No pedigree certificate uploaded yet.</div>') +
             '</div>';
 
         var healthSectionHtml =

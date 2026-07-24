@@ -41,7 +41,7 @@ body {
     display: flex;
     overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+        text-size-adjust: auto;
 }
 
 .auth-screen {
@@ -144,6 +144,12 @@ body.auth-active .main-content { display: none !important; }
     font-weight: 600;
     cursor: pointer;
     padding: 0;
+}
+
+.field-helper {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: var(--gray-500);
 }
 
 a { text-decoration: none; color: inherit; }
