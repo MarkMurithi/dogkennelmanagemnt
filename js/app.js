@@ -900,6 +900,10 @@ const App = {
         document.getElementById('dogColor').value = dog.color || '';
         document.getElementById('dogMicrochip').value = dog.microchip || '';
         document.getElementById('dogRegistration').value = dog.registration || '';
+        document.getElementById('dogOwnerName').value = dog.ownerName || '';
+        document.getElementById('dogOwnerPhone').value = dog.ownerPhone || '';
+        document.getElementById('dogOwnerAddress').value = dog.ownerAddress || '';
+        document.getElementById('dogPedigreeNotes').value = dog.pedigreeNotes || '';
         document.getElementById('dogStatus').value = dog.status || 'Active';
         document.getElementById('dogForSale').checked = dog.forSale || false;
         document.getElementById('dogValue').value = dog.value || '';
@@ -941,6 +945,10 @@ const App = {
                     color: document.getElementById('dogColor').value.trim(),
                     microchip: document.getElementById('dogMicrochip').value.trim(),
                     registration: document.getElementById('dogRegistration').value.trim(),
+                    ownerName: document.getElementById('dogOwnerName').value.trim(),
+                    ownerPhone: document.getElementById('dogOwnerPhone').value.trim(),
+                    ownerAddress: document.getElementById('dogOwnerAddress').value.trim(),
+                    pedigreeNotes: document.getElementById('dogPedigreeNotes').value.trim(),
                     status: document.getElementById('dogStatus').value,
                     forSale: document.getElementById('dogForSale').checked,
                     value: parseFloat(document.getElementById('dogValue').value) || null,

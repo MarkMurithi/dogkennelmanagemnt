@@ -387,7 +387,7 @@ const Components = {
                 fieldItem('Ownership', dog.ownerName || 'Not assigned') +
                 fieldItem('Owner contact', dog.ownerPhone || 'N/A') +
                 fieldItem('Owner address', dog.ownerAddress || 'N/A') +
-                fieldItem('Pedigree notes', 'Not recorded for this dog yet') +
+                fieldItem('Pedigree notes', dog.pedigreeNotes || 'Not recorded for this dog yet') +
             '</div>';
 
         var healthSectionHtml =

@@ -84,6 +84,13 @@ def init_db():
             dob TEXT,
             status TEXT,
             weight TEXT,
+            color TEXT,
+            microchip TEXT,
+            registration TEXT,
+            ownerName TEXT,
+            ownerPhone TEXT,
+            ownerAddress TEXT,
+            pedigreeNotes TEXT,
             notes TEXT,
             value TEXT,
             forSale INTEGER DEFAULT 0,
@@ -95,6 +102,22 @@ def init_db():
         )
         """
     )
+    conn.commit()
+    for column_name in [
+        "color",
+        "microchip",
+        "registration",
+        "ownerName",
+        "ownerPhone",
+        "ownerAddress",
+        "pedigreeNotes",
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE dogs ADD COLUMN {column_name} TEXT")
+        except Exception as exc:
+            conn.rollback()
+            if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
+                raise
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS puppies (
@@ -272,7 +295,7 @@ def restore_backup_payload(payload):
     conn.execute("DELETE FROM users")
     for dog in payload.get("dogs", []):
         conn.execute(
-            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, color, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 dog.get("id") or "d" + str(int(__import__("time").time() * 1000)),
                 dog.get("name", ""),
@@ -281,6 +304,13 @@ def restore_backup_payload(payload):
                 dog.get("dob"),
                 dog.get("status", "Active"),
                 dog.get("weight", ""),
+                dog.get("color", ""),
+                dog.get("microchip", ""),
+                dog.get("registration", ""),
+                dog.get("ownerName", ""),
+                dog.get("ownerPhone", ""),
+                dog.get("ownerAddress", ""),
+                dog.get("pedigreeNotes", ""),
                 dog.get("notes", ""),
                 dog.get("value", ""),
                 int(bool(dog.get("forSale", False))),
@@ -594,7 +624,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             raise ValueError("A dog with this name already exists.")
         dog_id = payload.get("id") or "d" + str(int(__import__("time").time() * 1000))
         conn.execute(
-            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, color, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 dog_id,
                 name,
@@ -603,6 +633,13 @@ class KennelHandler(BaseHTTPRequestHandler):
                 payload.get("dob"),
                 payload.get("status", "Active"),
                 payload.get("weight", ""),
+                payload.get("color", ""),
+                payload.get("microchip", ""),
+                payload.get("registration", ""),
+                payload.get("ownerName", ""),
+                payload.get("ownerPhone", ""),
+                payload.get("ownerAddress", ""),
+                payload.get("pedigreeNotes", ""),
                 payload.get("notes", ""),
                 payload.get("value", ""),
                 int(bool(payload.get("forSale", False))),
@@ -735,7 +772,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.close()
             raise ValueError("A dog with this name already exists.")
         conn.execute(
-            "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
+            "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, color=?, microchip=?, registration=?, ownerName=?, ownerPhone=?, ownerAddress=?, pedigreeNotes=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
             (
                 name,
                 breed,
@@ -743,6 +780,13 @@ class KennelHandler(BaseHTTPRequestHandler):
                 payload.get("dob"),
                 payload.get("status", "Active"),
                 payload.get("weight", ""),
+                payload.get("color", ""),
+                payload.get("microchip", ""),
+                payload.get("registration", ""),
+                payload.get("ownerName", ""),
+                payload.get("ownerPhone", ""),
+                payload.get("ownerAddress", ""),
+                payload.get("pedigreeNotes", ""),
                 payload.get("notes", ""),
                 payload.get("value", ""),
                 int(bool(payload.get("forSale", False))),
@@ -949,16 +993,23 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "dob": row[4],
                     "status": row[5],
                     "weight": row[6],
-                    "notes": row[7],
-                    "value": row[8],
-                    "forSale": bool(row[9]),
-                    "price": row[10],
-                    "image": row[11],
-                    "records": json.loads(row[12]) if row[12] else {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []},
-                    "attachments": json.loads(row[13]) if row[13] else [],
-                    "createdAt": row[14],
+                    "color": row[7],
+                    "microchip": row[8],
+                    "registration": row[9],
+                    "ownerName": row[10],
+                    "ownerPhone": row[11],
+                    "ownerAddress": row[12],
+                    "pedigreeNotes": row[13],
+                    "notes": row[14],
+                    "value": row[15],
+                    "forSale": bool(row[16]),
+                    "price": row[17],
+                    "image": row[18],
+                    "records": json.loads(row[19]) if row[19] else {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []},
+                    "attachments": json.loads(row[20]) if row[20] else [],
+                    "createdAt": row[21],
                 }
-                for row in self._fetch_all("SELECT id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt FROM dogs ORDER BY createdAt DESC")
+                for row in self._fetch_all("SELECT id, name, breed, gender, dob, status, weight, color, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, notes, value, forSale, price, image, records, attachments, createdAt FROM dogs ORDER BY createdAt DESC")
             ],
             "puppies": [
                 {
@@ -1417,7 +1468,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            rows = self._fetch_all("SELECT * FROM dogs ORDER BY createdAt DESC")
+            rows = self._fetch_all("SELECT id, name, breed, gender, dob, status, weight, color, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, notes, value, forSale, price, image, records, attachments, createdAt FROM dogs ORDER BY createdAt DESC")
             dogs_payload = []
             for row in rows:
                 dogs_payload.append({
@@ -1428,14 +1479,21 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "dob": row[4],
                     "status": row[5],
                     "weight": row[6],
-                    "notes": row[7],
-                    "value": row[8],
-                    "forSale": bool(row[9]),
-                    "price": row[10],
-                    "image": row[11],
-                    "records": json.loads(row[12]) if row[12] else {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []},
-                    "attachments": json.loads(row[13]) if row[13] else [],
-                    "createdAt": row[14],
+                    "color": row[7],
+                    "microchip": row[8],
+                    "registration": row[9],
+                    "ownerName": row[10],
+                    "ownerPhone": row[11],
+                    "ownerAddress": row[12],
+                    "pedigreeNotes": row[13],
+                    "notes": row[14],
+                    "value": row[15],
+                    "forSale": bool(row[16]),
+                    "price": row[17],
+                    "image": row[18],
+                    "records": json.loads(row[19]) if row[19] else {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []},
+                    "attachments": json.loads(row[20]) if row[20] else [],
+                    "createdAt": row[21],
                 })
             self._send_json(200, dogs_payload)
             return
@@ -1521,7 +1579,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                     self._send_json(409, {"ok": False, "error": "A dog with this name already exists."})
                     return
                 conn.execute(
-                    "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
+                    "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, color=?, microchip=?, registration=?, ownerName=?, ownerPhone=?, ownerAddress=?, pedigreeNotes=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
                     (
                         name,
                         breed,
@@ -1529,6 +1587,13 @@ class KennelHandler(BaseHTTPRequestHandler):
                         payload.get("dob"),
                         payload.get("status", "Active"),
                         payload.get("weight", ""),
+                        payload.get("color", ""),
+                        payload.get("microchip", ""),
+                        payload.get("registration", ""),
+                        payload.get("ownerName", ""),
+                        payload.get("ownerPhone", ""),
+                        payload.get("ownerAddress", ""),
+                        payload.get("pedigreeNotes", ""),
                         payload.get("notes", ""),
                         payload.get("value", ""),
                         int(bool(payload.get("forSale", False))),
