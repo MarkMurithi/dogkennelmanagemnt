@@ -825,29 +825,53 @@ const Components = {
                 var nextVaccinationText = (puppy.vaccinations && puppy.vaccinations.length > 0 && puppy.vaccinations[0].nextDue) ? puppy.vaccinations[0].nextDue : 'Not scheduled';
                 var dewormingText = (puppy.deworming && puppy.deworming.length > 0 && puppy.deworming[0].date) ? puppy.deworming[0].date : 'Not recorded';
                 var nextDewormingText = (puppy.deworming && puppy.deworming.length > 0 && puppy.deworming[0].nextDue) ? puppy.deworming[0].nextDue : 'Not scheduled';
-                var saleAmountText = (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold') ? '<div class="detail-info-item"><label>Total Sale Amount</label><p>' + (puppy.saleTotalAmount !== undefined && puppy.saleTotalAmount !== null && puppy.saleTotalAmount !== '' ? 'KSh ' + Number(puppy.saleTotalAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' + '<div class="detail-info-item"><label>Received Amount</label><p>' + (puppy.saleReceivedAmount !== undefined && puppy.saleReceivedAmount !== null && puppy.saleReceivedAmount !== '' ? 'KSh ' + Number(puppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' + '<div class="detail-info-item"><label>Unpaid Amount</label><p>' + (puppy.saleUnpaidAmount !== undefined && puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== '' ? 'KSh ' + Number(puppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' : '';
+                var hasHealthTracking = vaccinationText !== 'Not recorded' || dewormingText !== 'Not recorded';
+                var healthStatusText = puppy.healthStatus || (hasHealthTracking ? 'Under tracking' : 'Not recorded');
+                var ownerProfileText = (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold')
+                    ? '<div class="detail-info-item"><label>Owner Name</label><p>' + (puppy.ownerName || 'N/A') + '</p></div>' +
+                      '<div class="detail-info-item"><label>Phone Number</label><p>' + (puppy.ownerPhone || 'N/A') + '</p></div>' +
+                      '<div class="detail-info-item"><label>Address</label><p>' + (puppy.ownerAddress || 'N/A') + '</p></div>' +
+                      '<div class="detail-info-item"><label>Total Sale Amount</label><p>' + (puppy.saleTotalAmount !== undefined && puppy.saleTotalAmount !== null && puppy.saleTotalAmount !== '' ? 'KSh ' + Number(puppy.saleTotalAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' +
+                      '<div class="detail-info-item"><label>Received Amount</label><p>' + (puppy.saleReceivedAmount !== undefined && puppy.saleReceivedAmount !== null && puppy.saleReceivedAmount !== '' ? 'KSh ' + Number(puppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' +
+                      '<div class="detail-info-item"><label>Unpaid Amount</label><p>' + (puppy.saleUnpaidAmount !== undefined && puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== '' ? 'KSh ' + Number(puppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>'
+                    : '<div class="detail-info-item"><label>Owner Details</label><p>Assigned when puppy is booked or sold.</p></div>';
 
                 puppyCardsHtml += '<div class="card section-card">' +
                     '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3><div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary" onclick="App.editPuppy(\'' + puppy.id + '\')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
                     '<div class="card-body">' +
+                    '<div class="puppy-profile-sections">' +
+                    '<section class="puppy-profile-section">' +
+                    '<h4><i class="fas fa-id-badge"></i> Identity</h4>' +
                     '<div class="detail-info-grid">' +
+                    '<div class="detail-info-item"><label>Name</label><p>' + (puppy.name || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Date of Birth</label><p>' + (puppy.dob ? new Date(puppy.dob).toLocaleDateString() : 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Gender</label><p>' + (puppy.gender || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Sale Status</label><p>' + (puppy.saleStatus || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Father</label><p>' + (puppy.father || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Mother</label><p>' + (puppy.mother || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Sire\'s Father</label><p>' + (puppy.sireGrandfather || puppy.grandfather || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Sire\'s Mother</label><p>' + (puppy.sireGrandmother || puppy.grandmother || 'N/A') + '</p></div>' +
+                    '</div></section>' +
+                    '<section class="puppy-profile-section">' +
+                    '<h4><i class="fas fa-dna"></i> Pedigree</h4>' +
+                    '<div class="detail-info-grid">' +
+                    '<div class="detail-info-item"><label>Sire</label><p>' + (puppy.father || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Dam</label><p>' + (puppy.mother || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Sire\'s Father</label><p>' + (puppy.sireGrandfather || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Sire\'s Mother</label><p>' + (puppy.sireGrandmother || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Dam\'s Father</label><p>' + (puppy.damGrandfather || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Dam\'s Mother</label><p>' + (puppy.damGrandmother || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Owner Name</label><p>' + (puppy.ownerName || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Phone Number</label><p>' + (puppy.ownerPhone || 'N/A') + '</p></div>' +
-                    '<div class="detail-info-item"><label>Address</label><p>' + (puppy.ownerAddress || 'N/A') + '</p></div>' +
+                    '</div></section>' +
+                    '<section class="puppy-profile-section">' +
+                    '<h4><i class="fas fa-heartbeat"></i> Health</h4>' +
+                    '<div class="detail-info-grid">' +
                     '<div class="detail-info-item"><label>Vaccination</label><p>' + vaccinationText + '</p></div>' +
                     '<div class="detail-info-item"><label>Next Vaccination</label><p>' + nextVaccinationText + '</p></div>' +
                     '<div class="detail-info-item"><label>Deworming</label><p>' + dewormingText + '</p></div>' +
                     '<div class="detail-info-item"><label>Next Deworming</label><p>' + nextDewormingText + '</p></div>' +
-                    saleAmountText +
+                    '<div class="detail-info-item"><label>Health Status</label><p>' + healthStatusText + '</p></div>' +
+                    '</div></section>' +
+                    '<section class="puppy-profile-section">' +
+                    '<h4><i class="fas fa-handshake"></i> Sale & Owner</h4>' +
+                    '<div class="detail-info-grid">' +
+                    '<div class="detail-info-item"><label>Sale Status</label><p>' + (puppy.saleStatus || 'Available') + '</p></div>' +
+                    ownerProfileText +
+                    '</div></section>' +
                     '</div></div></div>';
             }
         }
