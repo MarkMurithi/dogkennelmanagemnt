@@ -221,20 +221,23 @@ def init_db():
         """
     )
     conn.commit()
+    _ensure_super_admin(conn)
+    conn.commit()
+    conn.close()
 
-    admin_row = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", ("admin@bigpaw.com",)).fetchone()
+
+def _ensure_super_admin(conn):
+    admin_row = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", (SUPER_ADMIN_EMAIL,)).fetchone()
     if admin_row is None:
         conn.execute(
             "INSERT INTO users (id, name, email, password, role, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("u-admin-1", "Admin User", "admin@bigpaw.com", hash_password("admin123"), "admin", 1, "2026-01-01T00:00:00.000Z"),
+            ("u-admin-1", "Admin User", SUPER_ADMIN_EMAIL, hash_password("admin123"), "admin", 1, "2026-01-01T00:00:00.000Z"),
         )
-    else:
-        conn.execute(
-            "UPDATE users SET password = ?, role = ?, active = 1 WHERE id = ?",
-            (hash_password("admin123"), "admin", admin_row[0]),
-        )
-    conn.commit()
-    conn.close()
+        return
+    conn.execute(
+        "UPDATE users SET password = ?, role = ?, active = 1 WHERE id = ?",
+        (hash_password("admin123"), "admin", admin_row[0]),
+    )
 
 
 def restore_backup_payload(payload):
@@ -365,6 +368,7 @@ def restore_backup_payload(payload):
                 user.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
             ),
         )
+    _ensure_super_admin(conn)
     conn.commit()
     conn.close()
     return payload

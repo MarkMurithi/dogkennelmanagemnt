@@ -105,6 +105,24 @@ class BackupTests(unittest.TestCase):
         reports = self._request_json("/api/daily-reports", None, method="GET", token=self._admin_token())
         self.assertTrue(any(item.get("personInCharge") == "Jane" for item in reports), reports)
 
+    def test_import_backup_file_reseeds_super_admin(self):
+        backup_path = Path(self.temp_dir.name) / "import-backup-no-admin.json"
+        backup_path.write_text(json.dumps({
+            "dogs": [],
+            "puppies": [],
+            "users": [
+                {"id": "u-staff-1", "name": "Staff", "email": "staff-only@example.com", "password": server.hash_password("staff123"), "role": "staff", "active": True, "createdAt": "2026-07-24T09:20:00Z"}
+            ]
+        }), encoding="utf-8")
+
+        server.import_backup_file(backup_path)
+
+        admin_login = self._request_json(
+            "/api/auth/login",
+            {"identifier": "admin@bigpaw.com", "password": "admin123"},
+        )
+        self.assertTrue(admin_login.get("ok"), admin_login)
+
 
 if __name__ == "__main__":
     unittest.main()
