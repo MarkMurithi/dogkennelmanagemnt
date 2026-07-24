@@ -24,3 +24,6 @@ Then open http://127.0.0.1:8001/.
 - The app is configured to run with Python on platforms like Render or Railway.
 - Use the included Procfile to start the server.
 - Set the PORT environment variable as required by the hosting platform.
+- For shared, always-available hosted data, set `DATABASE_URL` to a Postgres database.
+- The included `render.yaml` is configured to attach a Render Postgres database to the web service.
+- If `DATABASE_URL` is not set, the server falls back to the local SQLite file at `data/kennel.db` for local development and tests.

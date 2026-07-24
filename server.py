@@ -4,12 +4,13 @@ import hmac
 import json
 import os
 import secrets
-import sqlite3
 import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+
+from db_backend import DatabaseIntegrityError, DatabaseOperationalError, connect_database
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "kennel.db"
@@ -40,9 +41,7 @@ def verify_password(stored_password, password):
 
 
 def init_db():
-    db_path = Path(DB_PATH)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = connect_database(DB_PATH)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -58,7 +57,7 @@ def init_db():
     )
     try:
         conn.execute("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1")
-    except sqlite3.OperationalError:
+    except DatabaseOperationalError:
         pass
     conn.execute(
         """
@@ -232,6 +231,145 @@ def init_db():
         )
     conn.commit()
     conn.close()
+
+
+def restore_backup_payload(payload):
+    conn = connect_database(DB_PATH)
+    conn.execute("DELETE FROM auth_tokens")
+    conn.execute("DELETE FROM pending_approvals")
+    conn.execute("DELETE FROM audit_logs")
+    conn.execute("DELETE FROM daily_reports")
+    conn.execute("DELETE FROM dogs")
+    conn.execute("DELETE FROM puppies")
+    conn.execute("DELETE FROM finance")
+    conn.execute("DELETE FROM events")
+    conn.execute("DELETE FROM activities")
+    conn.execute("DELETE FROM users")
+    for dog in payload.get("dogs", []):
+        conn.execute(
+            "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                dog.get("id") or "d" + str(int(__import__("time").time() * 1000)),
+                dog.get("name", ""),
+                dog.get("breed", ""),
+                dog.get("gender", "Unknown"),
+                dog.get("dob"),
+                dog.get("status", "Active"),
+                dog.get("weight", ""),
+                dog.get("notes", ""),
+                dog.get("value", ""),
+                int(bool(dog.get("forSale", False))),
+                dog.get("price", ""),
+                dog.get("image", ""),
+                json.dumps(dog.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}),
+                json.dumps(dog.get("attachments") or []),
+                dog.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for puppy in payload.get("puppies", []):
+        conn.execute(
+            "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                puppy.get("id") or "p" + str(int(__import__("time").time() * 1000)),
+                puppy.get("name", ""),
+                puppy.get("dob"),
+                puppy.get("gender", "Unknown"),
+                puppy.get("saleStatus", "Available"),
+                puppy.get("saleTotalAmount"),
+                puppy.get("saleReceivedAmount"),
+                puppy.get("saleUnpaidAmount"),
+                json.dumps(puppy.get("vaccinations") or []),
+                json.dumps(puppy.get("deworming") or []),
+                puppy.get("father", ""),
+                puppy.get("mother", ""),
+                puppy.get("sireGrandfather", ""),
+                puppy.get("sireGrandmother", ""),
+                puppy.get("damGrandfather", ""),
+                puppy.get("damGrandmother", ""),
+                puppy.get("ownerName", ""),
+                puppy.get("ownerPhone", ""),
+                puppy.get("ownerAddress", ""),
+                puppy.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for entry in payload.get("finance", []):
+        conn.execute(
+            "INSERT INTO finance (id, type, title, category, amount, date, related, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                entry.get("id") or "f" + str(int(__import__("time").time() * 1000)),
+                entry.get("type", "expense"),
+                entry.get("title", ""),
+                entry.get("category", ""),
+                entry.get("amount", 0),
+                entry.get("date", datetime.datetime.now(datetime.UTC).date().isoformat()),
+                entry.get("related", ""),
+                entry.get("notes", ""),
+                entry.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for event in payload.get("events", []):
+        conn.execute(
+            "INSERT INTO events (id, title, date, notes, createdAt) VALUES (?, ?, ?, ?, ?)",
+            (
+                event.get("id") or "ev" + str(int(__import__("time").time() * 1000)),
+                event.get("title", ""),
+                event.get("date", datetime.datetime.now(datetime.UTC).date().isoformat()),
+                event.get("notes", ""),
+                event.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for report in payload.get("dailyReports", []) or payload.get("daily_reports", []):
+        conn.execute(
+            "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                report.get("id") or "dr" + str(int(__import__("time").time() * 1000)),
+                report.get("date", datetime.datetime.now(datetime.UTC).date().isoformat()),
+                report.get("foodRemaining", ""),
+                report.get("foodToday", ""),
+                int(bool(report.get("kennelsWashed", False))),
+                json.dumps(report.get("dogStatuses") or []),
+                report.get("visitors", ""),
+                report.get("personInCharge", ""),
+                report.get("medicationNotes", ""),
+                report.get("cleaningChecklist", ""),
+                report.get("staffComments", ""),
+                report.get("notes", ""),
+                report.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for activity in payload.get("activities", []):
+        conn.execute(
+            "INSERT INTO activities (id, type, text, color, time) VALUES (?, ?, ?, ?, ?)",
+            (
+                activity.get("id") or "a" + str(int(__import__("time").time() * 1000)),
+                activity.get("type", "info"),
+                activity.get("text", ""),
+                activity.get("color", "blue"),
+                activity.get("time") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    for user in payload.get("users", []):
+        conn.execute(
+            "INSERT INTO users (id, name, email, password, role, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                user.get("id") or "u" + str(int(__import__("time").time() * 1000)),
+                user.get("name", ""),
+                user.get("email", ""),
+                user.get("password") or hash_password("changeme"),
+                user.get("role", "staff"),
+                int(bool(user.get("active", True))),
+                user.get("createdAt") or datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+            ),
+        )
+    conn.commit()
+    conn.close()
+    return payload
+
+
+def import_backup_file(file_path):
+    backup_path = Path(file_path)
+    payload = json.loads(backup_path.read_text(encoding="utf-8"))
+    return restore_backup_payload(payload)
 
 
 class KennelHandler(BaseHTTPRequestHandler):
@@ -561,6 +699,24 @@ class KennelHandler(BaseHTTPRequestHandler):
                 {"id": row[0], "type": row[1], "text": row[2], "color": row[3], "time": row[4]}
                 for row in self._fetch_all("SELECT id, type, text, color, time FROM activities ORDER BY time DESC LIMIT 50")
             ],
+            "dailyReports": [
+                {
+                    "id": row[0],
+                    "date": row[1],
+                    "foodRemaining": row[2],
+                    "foodToday": row[3],
+                    "kennelsWashed": bool(row[4]),
+                    "dogStatuses": json.loads(row[5]) if row[5] else [],
+                    "visitors": row[6],
+                    "personInCharge": row[7],
+                    "medicationNotes": row[8],
+                    "cleaningChecklist": row[9],
+                    "staffComments": row[10],
+                    "notes": row[11],
+                    "createdAt": row[12],
+                }
+                for row in self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
+            ],
             "users": [
                 {"id": row[0], "name": row[1], "email": row[2], "password": row[3], "role": row[4], "active": bool(row[5]), "createdAt": row[6]}
                 for row in self._fetch_all("SELECT id, name, email, password, role, active, createdAt FROM users ORDER BY createdAt DESC")
@@ -597,113 +753,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             payload = json.loads(row["snapshot"])
         except (TypeError, ValueError):
             return None
-        conn = self._connect()
-        conn.execute("DELETE FROM dogs")
-        conn.execute("DELETE FROM puppies")
-        conn.execute("DELETE FROM finance")
-        conn.execute("DELETE FROM events")
-        conn.execute("DELETE FROM activities")
-        conn.execute("DELETE FROM users")
-        for dog in payload.get("dogs", []):
-            conn.execute(
-                "INSERT INTO dogs (id, name, breed, gender, dob, status, weight, notes, value, forSale, price, image, records, attachments, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    dog.get("id") or "d" + str(int(__import__("time").time() * 1000)),
-                    dog.get("name", ""),
-                    dog.get("breed", ""),
-                    dog.get("gender", "Unknown"),
-                    dog.get("dob"),
-                    dog.get("status", "Active"),
-                    dog.get("weight", ""),
-                    dog.get("notes", ""),
-                    dog.get("value", ""),
-                    int(bool(dog.get("forSale", False))),
-                    dog.get("price", ""),
-                    dog.get("image", ""),
-                    json.dumps(dog.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}),
-                    json.dumps(dog.get("attachments") or []),
-                    dog.get("createdAt") or self._now(),
-                ),
-            )
-        for puppy in payload.get("puppies", []):
-            conn.execute(
-                "INSERT INTO puppies (id, name, dob, gender, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    puppy.get("id") or "p" + str(int(__import__("time").time() * 1000)),
-                    puppy.get("name", ""),
-                    puppy.get("dob"),
-                    puppy.get("gender", "Unknown"),
-                    puppy.get("saleStatus", "Available"),
-                    puppy.get("saleTotalAmount"),
-                    puppy.get("saleReceivedAmount"),
-                    puppy.get("saleUnpaidAmount"),
-                    json.dumps(puppy.get("vaccinations") or []),
-                    json.dumps(puppy.get("deworming") or []),
-                    puppy.get("father", ""),
-                    puppy.get("mother", ""),
-                    puppy.get("sireGrandfather", ""),
-                    puppy.get("sireGrandmother", ""),
-                    puppy.get("damGrandfather", ""),
-                    puppy.get("damGrandmother", ""),
-                    puppy.get("ownerName", ""),
-                    puppy.get("ownerPhone", ""),
-                    puppy.get("ownerAddress", ""),
-                    puppy.get("createdAt") or self._now(),
-                ),
-            )
-        for entry in payload.get("finance", []):
-            conn.execute(
-                "INSERT INTO finance (id, type, title, category, amount, date, related, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    entry.get("id") or "f" + str(int(__import__("time").time() * 1000)),
-                    entry.get("type", "expense"),
-                    entry.get("title", ""),
-                    entry.get("category", ""),
-                    entry.get("amount", 0),
-                    entry.get("date", self._date()),
-                    entry.get("related", ""),
-                    entry.get("notes", ""),
-                    entry.get("createdAt") or self._now(),
-                ),
-            )
-        for event in payload.get("events", []):
-            conn.execute(
-                "INSERT INTO events (id, title, date, notes, createdAt) VALUES (?, ?, ?, ?, ?)",
-                (
-                    event.get("id") or "ev" + str(int(__import__("time").time() * 1000)),
-                    event.get("title", ""),
-                    event.get("date", self._date()),
-                    event.get("notes", ""),
-                    event.get("createdAt") or self._now(),
-                ),
-            )
-        for activity in payload.get("activities", []):
-            conn.execute(
-                "INSERT INTO activities (id, type, text, color, time) VALUES (?, ?, ?, ?, ?)",
-                (
-                    activity.get("id") or "a" + str(int(__import__("time").time() * 1000)),
-                    activity.get("type", "info"),
-                    activity.get("text", ""),
-                    activity.get("color", "blue"),
-                    activity.get("time") or self._now(),
-                ),
-            )
-        for user in payload.get("users", []):
-            conn.execute(
-                "INSERT INTO users (id, name, email, password, role, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    user.get("id") or "u" + str(int(__import__("time").time() * 1000)),
-                    user.get("name", ""),
-                    user.get("email", ""),
-                    user.get("password") or self._hash_password("changeme"),
-                    user.get("role", "staff"),
-                    int(bool(user.get("active", True))),
-                    user.get("createdAt") or self._now(),
-                ),
-            )
-        conn.commit()
-        conn.close()
-        return payload
+        return restore_backup_payload(payload)
 
     def do_OPTIONS(self):
         self._send_json(204, None)
@@ -911,7 +961,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 self._create_backup(label="Auto-export", source="auto")
                 self._log_audit(user, "create_user", user_id, f"Created user {name} ({email})")
                 self._send_json(200, {"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]}})
-            except sqlite3.IntegrityError:
+            except DatabaseIntegrityError:
                 conn.close()
                 self._send_json(400, {"ok": False, "error": "An account with this email already exists."})
             return
@@ -1015,7 +1065,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.close()
                 token = self._issue_token(user_id)
                 self._send_json(200, {"ok": True, "token": token, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[4]}})
-            except sqlite3.IntegrityError:
+            except DatabaseIntegrityError:
                 conn.close()
                 self._send_json(400, {"ok": False, "error": "An account with this email already exists."})
             return
@@ -1446,9 +1496,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             return {}
 
     def _connect(self):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return connect_database(DB_PATH)
 
     def _fetch_all(self, query):
         conn = self._connect()
@@ -1488,6 +1536,11 @@ class KennelHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--import-backup":
+        init_db()
+        imported = import_backup_file(sys.argv[2])
+        print(f"Imported backup from {sys.argv[2]} with {len(imported.get('dogs', []))} dogs and {len(imported.get('puppies', []))} puppies.")
+        sys.exit(0)
     init_db()
     server = ThreadingHTTPServer((HOST, PORT), KennelHandler)
     print(f"Bigpaw backend running at http://localhost:{PORT}")

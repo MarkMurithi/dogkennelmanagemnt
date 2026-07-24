@@ -83,6 +83,28 @@ class BackupTests(unittest.TestCase):
         dogs = self._request_json("/api/dogs", None, method="GET", token=self._admin_token())
         self.assertTrue(any(item.get("name") == "Max" for item in dogs))
 
+    def test_import_backup_file_restores_dogs_and_daily_reports(self):
+        backup_path = Path(self.temp_dir.name) / "import-backup.json"
+        backup_path.write_text(json.dumps({
+            "dogs": [
+                {"id": "d-import-1", "name": "Bella", "breed": "Beagle", "gender": "Female", "records": {}, "attachments": [], "createdAt": "2026-07-24T09:00:00Z"}
+            ],
+            "dailyReports": [
+                {"id": "dr-import-1", "date": "2026-07-24", "foodRemaining": "2 bags", "foodToday": "1 bag", "kennelsWashed": True, "dogStatuses": [], "visitors": "0", "personInCharge": "Jane", "medicationNotes": "", "cleaningChecklist": "Done", "staffComments": "All good", "notes": "Imported report", "createdAt": "2026-07-24T09:10:00Z"}
+            ],
+            "users": [
+                {"id": "u-admin-1", "name": "Admin User", "email": "admin@bigpaw.com", "password": server.hash_password("admin123"), "role": "admin", "active": True, "createdAt": "2026-01-01T00:00:00.000Z"}
+            ]
+        }), encoding="utf-8")
+
+        server.import_backup_file(backup_path)
+
+        dogs = self._request_json("/api/dogs", None, method="GET", token=self._admin_token())
+        self.assertTrue(any(item.get("name") == "Bella" for item in dogs), dogs)
+
+        reports = self._request_json("/api/daily-reports", None, method="GET", token=self._admin_token())
+        self.assertTrue(any(item.get("personInCharge") == "Jane" for item in reports), reports)
+
 
 if __name__ == "__main__":
     unittest.main()
