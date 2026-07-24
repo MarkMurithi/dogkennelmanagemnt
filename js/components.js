@@ -511,7 +511,8 @@ const Components = {
             ? (alerts[0].message || 'A care item is due soon.')
             : (stats.total > 0 ? 'No urgent reminders right now — your kennel is in good shape.' : 'Add your first dog to start tracking care, sales, and upcoming milestones.');
         var insightCardsHtml = '';
-        insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-bell"></i></div><div><h4>' + alerts.length + '</h4><p>Alerts</p></div></div>';
+        var alertsInsightClass = alerts.length > 0 ? 'overview-insight-card pulse-attention' : 'overview-insight-card';
+        insightCardsHtml += '<div class="' + alertsInsightClass + '"><div class="overview-insight-icon"><i class="fas fa-bell"></i></div><div><h4>' + alerts.length + '</h4><p>Alerts</p></div></div>';
         insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-calendar-check"></i></div><div><h4>' + stats.upcomingEvents.length + '</h4><p>Upcoming</p></div></div>';
         insightCardsHtml += '<div class="overview-insight-card"><div class="overview-insight-icon"><i class="fas fa-tags"></i></div><div><h4>' + stats.forSale + '</h4><p>For Sale</p></div></div>';
 
@@ -567,9 +568,10 @@ const Components = {
                 var chartKey = taskKeys[i];
                 var chartValue = taskChartBuckets[chartKey];
                 var chartWidth = Math.max(12, Math.round((chartValue / maxBucketValue) * 100));
+                var chartPulseClass = chartValue > 0 ? ' overview-chart-fill-live' : '';
                 taskChartHtml += '<div class="overview-chart-row">' +
                     '<div class="overview-chart-meta"><strong>' + chartKey.charAt(0).toUpperCase() + chartKey.slice(1) + '</strong><span>' + chartValue + ' item' + (chartValue === 1 ? '' : 's') + '</span></div>' +
-                    '<div class="overview-chart-bar"><div class="overview-chart-fill" style="width:' + chartWidth + '%"></div></div>' +
+                    '<div class="overview-chart-bar"><div class="overview-chart-fill' + chartPulseClass + '" style="width:' + chartWidth + '%"></div></div>' +
                     '</div>';
             }
         } else {
@@ -610,8 +612,11 @@ const Components = {
         var activityHtml = '';
         for (var i = 0; i < activities.length; i++) {
             var a = activities[i];
-            activityHtml += '<div class="activity-item">' +
-                '<div class="activity-dot ' + a.color + '"></div>' +
+            var isNewestActivity = i === 0;
+            var activityPulseClass = isNewestActivity ? ' activity-item-live' : '';
+            var dotPulseClass = isNewestActivity ? ' activity-dot-live' : '';
+            activityHtml += '<div class="activity-item' + activityPulseClass + '">' +
+                '<div class="activity-dot ' + a.color + dotPulseClass + '"></div>' +
                 '<div class="activity-text">' + a.text + '</div>' +
                 '<div class="activity-time">' + this.timeAgo(a.time) + '</div>' +
                 '</div>';
@@ -682,7 +687,7 @@ const Components = {
             '<h3>' + spotlightTitle + '</h3>' +
             '<p>' + spotlightText + '</p>' +
             '</div>' +
-            '<div class="overview-spotlight-badge"><i class="fas fa-arrow-right"></i> ' + (stats.total > 0 ? 'Keep the day moving' : 'Start your first record') + '</div>' +
+            '<div class="overview-spotlight-badge pulse-shimmer"><i class="fas fa-arrow-right"></i> ' + (stats.total > 0 ? 'Keep the day moving' : 'Start your first record') + '</div>' +
             '</div>' +
             '<div class="overview-insight-grid">' + insightCardsHtml + '</div>' +
             '<div class="overview-dashboard-grid">' +
@@ -951,6 +956,7 @@ const Components = {
                 var isDueToday = dueStart.getTime() === todayStart.getTime();
                 var isMarkedDone = Boolean(event.record && event.record.alertDismissedFor && event.record.alertDismissedFor === event.nextDue);
                 var dueLabel = isDueToday ? 'Due today' : ('Due ' + dueDate.toLocaleDateString());
+                var duePulseClass = isDueToday && !isMarkedDone ? ' calendar-upcoming-item-live' : '';
                 var actionHtml = '';
                 if (isDueToday && event.record && event.record.id && !isMarkedDone) {
                     actionHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
@@ -961,7 +967,7 @@ const Components = {
                 var doneTickHtml = isMarkedDone
                     ? '<div class="calendar-task-done-indicator" title="Completed" aria-label="Task completed"><i class="fas fa-check-circle"></i></div>'
                     : '';
-                upcomingHtml += '<div class="alert-item calendar-upcoming-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                upcomingHtml += '<div class="alert-item calendar-upcoming-item' + duePulseClass + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
                     '<div class="alert-content">' +
                     '<h4>' + event.dogName + '</h4>' +
                     '<p>' + event.type + ' • ' + (event.record.type || 'Upcoming task') + '</p>' +
@@ -1052,7 +1058,10 @@ const Components = {
             }
         }
 
-        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3></div><div class="card-body">' + pendingRows + '</div></div>';
+        var pendingBadgeHtml = pendingApprovals.length > 0
+            ? '<span class="status-pill pulse-attention">' + pendingApprovals.length + ' pending</span>'
+            : '';
+        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3>' + pendingBadgeHtml + '</div><div class="card-body">' + pendingRows + '</div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
             '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
@@ -1216,7 +1225,8 @@ const Components = {
             '<div class="content-grid">' + puppyCardsHtml + '</div></div>';
     },
 
-    financePage: function() {
+    financePage: function(options) {
+        if (options === undefined) options = {};
         function formatCurrency(value) {
             return 'KSh ' + Number(value || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
@@ -1300,16 +1310,22 @@ const Components = {
             '<div class="finance-insight-card"><div class="finance-insight-label">Best month</div><div class="finance-insight-value">' + (bestMonth ? formatCurrency(bestMonth.net) : formatCurrency(0)) + '</div><div class="finance-insight-caption">' + (bestMonth ? bestMonth.label : 'No data') + '</div></div>' +
             '</div>';
 
+        var pulse = options.pulse || {};
+        var salesPulseClass = pulse.sales ? ' finance-live-pulse' : '';
+        var expensesPulseClass = pulse.expenses ? ' finance-live-pulse' : '';
+        var netPulseClass = pulse.net ? ' finance-live-pulse' : '';
+        var marginPulseClass = pulse.margin ? ' finance-live-pulse' : '';
+
         return '<div class="page-shell" id="pageFinance">' +
             '<section class="page-hero">' +
             '<div><div class="hero-badge"><i class="fas fa-chart-line"></i> Financial overview</div><h2>Track kennel sales, expenses, and profitability</h2><p>Keep a close eye on every sale and expense so your kennel remains financially healthy.</p></div>' +
             '</section>' +
             '<div class="finance-shell">' +
             '<div class="finance-summary-grid">' +
-            '<div class="finance-summary-card positive"><div class="label">Total sales</div><div class="value">' + formatCurrency(summary.totalSales) + '</div></div>' +
-            '<div class="finance-summary-card negative"><div class="label">Total expenses</div><div class="value">' + formatCurrency(summary.totalExpenses) + '</div></div>' +
-            '<div class="finance-summary-card ' + (summary.net >= 0 ? 'positive' : 'negative') + '"><div class="label">Net result</div><div class="value">' + formatCurrency(summary.net) + '</div></div>' +
-            '<div class="finance-summary-card"><div class="label">Profit margin</div><div class="value">' + Number(summary.profitMargin || 0).toFixed(1) + '%</div></div>' +
+            '<div class="finance-summary-card positive' + salesPulseClass + '"><div class="label">Total sales</div><div class="value">' + formatCurrency(summary.totalSales) + '</div></div>' +
+            '<div class="finance-summary-card negative' + expensesPulseClass + '"><div class="label">Total expenses</div><div class="value">' + formatCurrency(summary.totalExpenses) + '</div></div>' +
+            '<div class="finance-summary-card ' + (summary.net >= 0 ? 'positive' : 'negative') + netPulseClass + '"><div class="label">Net result</div><div class="value">' + formatCurrency(summary.net) + '</div></div>' +
+            '<div class="finance-summary-card' + marginPulseClass + '"><div class="label">Profit margin</div><div class="value">' + Number(summary.profitMargin || 0).toFixed(1) + '%</div></div>' +
             '</div>' +
             '<div class="finance-form-grid">' +
             '<div class="card finance-form-card"><div class="card-header"><h3><i class="fas fa-plus"></i> Add transaction</h3></div><div class="card-body"><form id="financeForm" class="modern-form">' +

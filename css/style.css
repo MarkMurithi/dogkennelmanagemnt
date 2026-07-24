@@ -1127,6 +1127,10 @@ body.modal-open {
     padding-top: 2px;
 }
 
+.calendar-upcoming-item-live {
+    animation: calendarDuePulse 2.2s ease-in-out infinite;
+}
+
 
 .record-empty i { font-size: 2rem; margin-bottom: 8px; display: block; }
 .record-empty p { font-size: 0.9rem; }
@@ -1503,6 +1507,12 @@ body.modal-open {
     white-space: nowrap;
 }
 
+.overview-spotlight-badge.pulse-shimmer {
+    background: linear-gradient(110deg, rgba(200,169,81,0.18) 0%, rgba(255,255,255,0.42) 45%, rgba(200,169,81,0.2) 100%);
+    background-size: 220% 100%;
+    animation: badgeShimmer 4.8s linear infinite;
+}
+
 .overview-insight-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1519,6 +1529,10 @@ body.modal-open {
     background: rgba(255,255,255,0.95);
     border: 1px solid rgba(200,169,81,0.14);
     box-shadow: var(--shadow);
+}
+
+.pulse-attention {
+    animation: attentionPulse 2.1s ease-in-out infinite;
 }
 
 .overview-insight-icon {
@@ -1657,6 +1671,11 @@ body.modal-open {
     transition: width 0.4s ease;
 }
 
+.overview-chart-fill-live {
+    animation: chartBreathe 2.6s ease-in-out infinite;
+    transform-origin: left center;
+}
+
 .overview-empty-state {
     color: var(--gray-400);
     padding: 8px 0;
@@ -1706,9 +1725,17 @@ body.modal-open {
     border-bottom: 1px solid var(--gray-100);
 }
 
+.activity-item-live {
+    animation: activityRowSettle 6s ease-out 1;
+}
+
 .activity-item:last-child { border-bottom: none; }
 
 .activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.activity-dot-live {
+    animation: activityDotPulse 1.1s ease-in-out 5;
+}
 
 .activity-dot.green { background: var(--success); }
 .activity-dot.blue { background: var(--info); }
@@ -1991,6 +2018,91 @@ body.modal-open {
 
 .finance-summary-card.positive .value { color: var(--success); }
 .finance-summary-card.negative .value { color: var(--danger); }
+
+.finance-summary-card.finance-live-pulse {
+    animation: financeFlash 1.1s ease-out 1;
+}
+
+@keyframes attentionPulse {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow: var(--shadow);
+    }
+    50% {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(245, 158, 11, 0.24);
+    }
+}
+
+@keyframes calendarDuePulse {
+    0%, 100% {
+        background: var(--white);
+        box-shadow: var(--shadow);
+    }
+    50% {
+        background: rgba(254, 243, 199, 0.35);
+        box-shadow: 0 10px 26px rgba(245, 158, 11, 0.2);
+    }
+}
+
+@keyframes badgeShimmer {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 220% 0%; }
+}
+
+@keyframes chartBreathe {
+    0%, 100% {
+        filter: saturate(1);
+        opacity: 0.94;
+    }
+    50% {
+        filter: saturate(1.2);
+        opacity: 1;
+    }
+}
+
+@keyframes activityDotPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+    }
+    50% {
+        transform: scale(1.35);
+        box-shadow: 0 0 0 7px rgba(16, 185, 129, 0);
+    }
+}
+
+@keyframes activityRowSettle {
+    0% { background: rgba(254, 243, 199, 0.28); }
+    100% { background: transparent; }
+}
+
+@keyframes financeFlash {
+    0% {
+        transform: scale(1);
+        box-shadow: var(--shadow);
+    }
+    35% {
+        transform: scale(1.02);
+        box-shadow: 0 14px 28px rgba(16, 185, 129, 0.2);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: var(--shadow);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pulse-attention,
+    .calendar-upcoming-item-live,
+    .overview-spotlight-badge.pulse-shimmer,
+    .overview-chart-fill-live,
+    .activity-item-live,
+    .activity-dot-live,
+    .finance-summary-card.finance-live-pulse {
+        animation: none !important;
+    }
+}
 
 .finance-form-grid {
     display: grid;

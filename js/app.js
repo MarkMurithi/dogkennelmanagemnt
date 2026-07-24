@@ -12,6 +12,7 @@ const App = {
     pendingDailyReportDogId: null,
     navigationHistory: [],
     submissionStatusPollId: null,
+    lastFinanceSnapshot: null,
 
     // ===== Initialize =====
     init() {
@@ -790,6 +791,30 @@ const App = {
         });
     },
 
+    getFinancePulseState() {
+        const summary = KennelData.getFinanceSummary() || {};
+        const snapshot = {
+            sales: Number(summary.totalSales || 0),
+            expenses: Number(summary.totalExpenses || 0),
+            net: Number(summary.net || 0),
+            margin: Number(summary.profitMargin || 0)
+        };
+
+        const previous = this.lastFinanceSnapshot;
+        this.lastFinanceSnapshot = snapshot;
+
+        if (!previous) {
+            return { sales: false, expenses: false, net: false, margin: false };
+        }
+
+        return {
+            sales: previous.sales !== snapshot.sales,
+            expenses: previous.expenses !== snapshot.expenses,
+            net: previous.net !== snapshot.net,
+            margin: previous.margin !== snapshot.margin
+        };
+    },
+
     // ===== Render =====
     render() {
         const main = document.getElementById('mainContent');
@@ -846,7 +871,7 @@ const App = {
                 main.innerHTML = Components.puppiesPage();
                 break;
             case 'finance':
-                main.innerHTML = Components.financePage();
+                main.innerHTML = Components.financePage({ pulse: this.getFinancePulseState() });
                 break;
             case 'health':
                 main.innerHTML = Components.healthRecordsPage();
