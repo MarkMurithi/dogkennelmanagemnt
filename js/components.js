@@ -54,6 +54,18 @@ const Components = {
         }, 4000);
     },
 
+    serverStatusBanner(serverState) {
+        if (!serverState || serverState.status === 'online' || !serverState.message) {
+            return '';
+        }
+        var icon = serverState.status === 'auth' ? 'fa-user-lock' : 'fa-wifi';
+        return '<div class="card section-card" style="margin-bottom:18px;border:1px solid rgba(194, 94, 44, 0.18);background:linear-gradient(135deg, rgba(255,247,237,0.98), rgba(255,237,213,0.96))">' +
+            '<div class="card-body" style="display:flex;gap:14px;align-items:flex-start">' +
+            '<div class="stat-icon yellow" style="flex-shrink:0"><i class="fas ' + icon + '"></i></div>' +
+            '<div><h3 style="margin-bottom:6px">Connection attention needed</h3><p style="margin:0;color:var(--gray-600)">' + serverState.message + '</p></div>' +
+            '</div></div>';
+    },
+
     statCard: function(icon, value, label, colorClass, clickAction) {
         var cardTag = 'div';
         var cardClass = 'stat-card';

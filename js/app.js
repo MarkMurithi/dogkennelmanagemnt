@@ -622,6 +622,7 @@ const App = {
     render() {
         const main = document.getElementById('mainContent');
         const authScreen = document.getElementById('authScreen');
+        const serverState = KennelData.getServerState();
         document.body.classList.toggle('auth-active', !KennelData.isAuthenticated());
 
         if (!KennelData.isAuthenticated()) {
@@ -632,6 +633,13 @@ const App = {
                 main.innerHTML = '';
             }
             this.setupAuthForm();
+            if (serverState && serverState.message) {
+                const authMessage = document.getElementById('authMessage');
+                if (authMessage) {
+                    authMessage.textContent = serverState.message;
+                    authMessage.className = 'auth-message ' + (serverState.status === 'auth' ? 'error' : 'warning');
+                }
+            }
             return;
         }
 
@@ -677,6 +685,9 @@ const App = {
                 break;
             default:
                 main.innerHTML = Components.overviewPage();
+        }
+        if (serverState && serverState.status !== 'online') {
+            main.innerHTML = Components.serverStatusBanner(serverState) + main.innerHTML;
         }
         this.setupPageInteractions();
         this.animateOverviewCounters();

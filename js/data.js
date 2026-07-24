@@ -9,6 +9,7 @@ const KennelData = {
     _users: [],
     _pendingApprovals: [],
     _currentUser: null,
+    _serverState: { status: 'online', message: '' },
     _listeners: [],
     _DATA_VERSION: 12,
     apiBase: (function() {
@@ -18,12 +19,17 @@ const KennelData = {
 
         const hostname = window.location.hostname || '';
         const protocol = window.location.protocol || '';
+        const port = window.location.port || '';
 
         if (protocol === 'file:' || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '') {
             return 'http://127.0.0.1:8001/api';
         }
 
-        return '/api';
+        if (!port || port === '80' || port === '443' || port === '8001') {
+            return window.location.origin + '/api';
+        }
+
+        return protocol + '//' + hostname + ':8001/api';
     })(),
 
     init() {
@@ -51,56 +57,141 @@ const KennelData = {
             this._resetEmptyState();
         }
         this._notify();
+        if (this._currentUser) {
+            this._validateSession().then(function(isValid) {
+                if (isValid) {
+                    this._syncFromServer();
+                }
+            }.bind(this));
+            return;
+        }
         this._syncFromServer();
     },
 
-    _request(path, options) {
+    _buildRequestConfig(options) {
         const headers = { 'Content-Type': 'application/json' };
         const token = this._getStoredToken();
         if (token) {
             headers.Authorization = 'Bearer ' + token;
         }
 
-        const config = Object.assign({
+        return Object.assign({
             headers: headers
         }, options || {});
+    },
+
+    _requestWithMeta(path, options) {
+        const config = this._buildRequestConfig(options);
         return fetch(this.apiBase + path, config).then(function(response) {
-            return response.json().catch(function() { return {}; });
+            return response.json().catch(function() { return {}; }).then(function(data) {
+                return {
+                    ok: response.ok,
+                    status: response.status,
+                    data: data
+                };
+            });
+        }).catch(function() {
+            return {
+                ok: false,
+                status: 0,
+                data: null,
+                error: 'Unable to reach the server.'
+            };
         });
     },
 
+    _request(path, options) {
+        return this._requestWithMeta(path, options).then(function(result) {
+            return result.data || {};
+        });
+    },
+
+    _setServerState(status, message) {
+        const nextStatus = status || 'online';
+        const nextMessage = message || '';
+        if (this._serverState.status === nextStatus && this._serverState.message === nextMessage) {
+            return;
+        }
+        this._serverState = { status: nextStatus, message: nextMessage };
+        this._notify();
+    },
+
+    _validateSession() {
+        const token = this._getStoredToken();
+        if (!this._currentUser) {
+            return Promise.resolve(false);
+        }
+        if (!token) {
+            this._currentUser = null;
+            this._clearAuthState();
+            this._save();
+            this._setServerState('auth', 'Your session expired. Sign in again to load kennel data.');
+            return Promise.resolve(false);
+        }
+
+        return this._requestWithMeta('/auth/me').then(function(result) {
+            if (result.ok && result.data && result.data.user) {
+                this._currentUser = result.data.user;
+                this._save();
+                this._setServerState('online', '');
+                return true;
+            }
+
+            if (result.status === 401) {
+                this._currentUser = null;
+                this._clearAuthState();
+                this._save();
+                this._setServerState('auth', 'Your session expired. Sign in again to load kennel data.');
+                return false;
+            }
+
+            this._setServerState('offline', 'Cannot reach the kennel server. Make sure your laptop server is running, then reopen the app from that laptop address.');
+            return false;
+        }.bind(this));
+    },
+
+    _syncCollection(path, targetKey, options) {
+        const settings = Object.assign({ clearOnForbidden: false }, options || {});
+        return this._requestWithMeta(path).then(function(result) {
+            if (result.ok && Array.isArray(result.data)) {
+                this[targetKey] = result.data;
+                this._save();
+                this._setServerState('online', '');
+                return;
+            }
+
+            if (result.status === 401) {
+                this._currentUser = null;
+                this._clearAuthState();
+                this._save();
+                this._setServerState('auth', 'Your session expired. Sign in again to load kennel data.');
+                return;
+            }
+
+            if (result.status === 403 && settings.clearOnForbidden) {
+                this[targetKey] = [];
+                this._save();
+                return;
+            }
+
+            if (result.status === 0) {
+                this._setServerState('offline', 'Cannot reach the kennel server. Make sure your laptop server is running, then reopen the app from that laptop address.');
+            }
+        }.bind(this));
+    },
+
     _syncFromServer() {
-        const self = this;
-        this._request('/dogs').then(function(data) {
-            self._dogs = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
-        this._request('/puppies').then(function(data) {
-            self._puppies = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
-        this._request('/finance').then(function(data) {
-            self._finance = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
-        this._request('/events').then(function(data) {
-            self._events = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
-        this._request('/daily-reports').then(function(data) {
-            self._dailyReports = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
-        this._request('/activities').then(function(data) {
-            self._activities = Array.isArray(data) ? data : [];
-            self._save();
-            self._notify();
-        }).catch(function() {});
+        const requests = [
+            this._syncCollection('/dogs', '_dogs'),
+            this._syncCollection('/puppies', '_puppies'),
+            this._syncCollection('/finance', '_finance', { clearOnForbidden: true }),
+            this._syncCollection('/events', '_events'),
+            this._syncCollection('/daily-reports', '_dailyReports'),
+            this._syncCollection('/activities', '_activities')
+        ];
+        return Promise.all(requests).then(function() {
+            this._notify();
+        }.bind(this));
     },
 
     _resetEmptyState() {
@@ -489,7 +580,9 @@ const KennelData = {
             this._persistAuthState(Boolean(rememberMe));
             this._save();
             this._notify();
-            return { ok: true, user: user };
+            return this._syncFromServer().then(function() {
+                return { ok: true, user: user };
+            });
         }.bind(this)).catch(function() {
             return { ok: false, error: 'Unable to create account.' };
         });
@@ -515,7 +608,9 @@ const KennelData = {
             this._persistAuthState(Boolean(rememberMe));
             this._save();
             this._notify();
-            return { ok: true, user: user };
+            return this._syncFromServer().then(function() {
+                return { ok: true, user: user };
+            });
         }.bind(this)).catch(function() {
             return { ok: false, error: 'Unable to reach the server.' };
         });
@@ -535,6 +630,10 @@ const KennelData = {
 
     getCurrentUser() {
         return this._currentUser;
+    },
+
+    getServerState() {
+        return Object.assign({}, this._serverState);
     },
 
     getCurrentUserRole() {
