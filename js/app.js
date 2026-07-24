@@ -10,6 +10,7 @@ const App = {
     currentInvoiceEntryId: null,
     pendingDailyReportDogId: null,
     navigationHistory: [],
+    submissionStatusPollId: null,
 
     // ===== Initialize =====
     init() {
@@ -25,6 +26,40 @@ const App = {
 
         // Subscribe to data changes
         KennelData.subscribe(() => this.render());
+
+        if (KennelData.isAuthenticated()) {
+            this.startSubmissionStatusPolling();
+        }
+    },
+
+    startSubmissionStatusPolling() {
+        if (this.submissionStatusPollId) {
+            clearInterval(this.submissionStatusPollId);
+            this.submissionStatusPollId = null;
+        }
+        if (!KennelData.isAuthenticated()) {
+            return;
+        }
+        KennelData.loadMySubmissions({ primeStatusCache: true }).catch(function() {});
+        this.submissionStatusPollId = window.setInterval(() => {
+            if (!KennelData.isAuthenticated()) {
+                return;
+            }
+            KennelData.pollSubmissionUpdates().then((updates) => {
+                if (!Array.isArray(updates) || updates.length === 0) {
+                    return;
+                }
+                updates.forEach((item) => {
+                    const label = item.label || item.entityType || 'submission';
+                    if (item.status === 'approved') {
+                        Components.toast('Approved: ' + label);
+                    } else if (item.status === 'rejected') {
+                        const reason = item.reviewNotes ? (' - ' + item.reviewNotes) : '';
+                        Components.toast('Rejected: ' + label + reason, 'error');
+                    }
+                });
+            }).catch(function() {});
+        }, 20000);
     },
 
     // ===== Navigation =====
@@ -288,7 +323,11 @@ const App = {
                             Components.toast(result && result.error ? result.error : 'Unable to save report', 'error');
                             return;
                         }
-                        Components.toast('Daily report saved');
+                        if (result.pending) {
+                            Components.toast('Your daily report is pending admin approval.');
+                        } else {
+                            Components.toast('Daily report saved');
+                        }
                         form.reset();
                         dogStatuses = [];
                         puppyStatuses = [];
@@ -752,6 +791,10 @@ const App = {
         document.body.classList.toggle('auth-active', !KennelData.isAuthenticated());
 
         if (!KennelData.isAuthenticated()) {
+            if (this.submissionStatusPollId) {
+                clearInterval(this.submissionStatusPollId);
+                this.submissionStatusPollId = null;
+            }
             if (authScreen) {
                 authScreen.innerHTML = Components.authPage();
             }
@@ -771,6 +814,10 @@ const App = {
 
         if (authScreen) {
             authScreen.innerHTML = '';
+        }
+
+        if (!this.submissionStatusPollId) {
+            this.startSubmissionStatusPolling();
         }
 
         if (!this.canAccessPage(this.currentPage)) {
@@ -1003,9 +1050,18 @@ const App = {
     },
 
     deletePuppy(puppyId) {
-        KennelData.deletePuppy(puppyId);
-        Components.toast('Puppy removed from the list');
-        this.render();
+        KennelData.deletePuppy(puppyId).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to remove puppy', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Puppy removal is pending admin approval.');
+                return;
+            }
+            Components.toast('Puppy removed from the list');
+            this.render();
+        });
     },
 
     openDailyReportForDog(dogId) {
@@ -1092,9 +1148,18 @@ const App = {
     },
 
     deleteFinanceEntry(entryId) {
-        KennelData.deleteFinanceEntry(entryId);
-        Components.toast('Finance entry removed');
-        this.render();
+        KennelData.deleteFinanceEntry(entryId).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to remove finance entry', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Finance deletion is pending admin approval.');
+                return;
+            }
+            Components.toast('Finance entry removed');
+            this.render();
+        });
     },
 
     resetAppData() {
@@ -1245,11 +1310,21 @@ const App = {
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete ${dog.name}? This action cannot be undone.`;
         document.getElementById('deleteModal').classList.add('open');
         document.getElementById('deleteModalConfirm').onclick = () => {
-            KennelData.deleteDog(dogId);
-            document.getElementById('deleteModal').classList.remove('open');
-            Components.toast(`${dog.name} deleted from kennel`);
-            this.closeDogDetail();
-            this.navigate('mydogs');
+            KennelData.deleteDog(dogId).then((result) => {
+                document.getElementById('deleteModal').classList.remove('open');
+                if (!result || !result.ok) {
+                    Components.toast(result && result.error ? result.error : 'Unable to remove dog', 'error');
+                    return;
+                }
+                if (result.pending) {
+                    Components.toast(`${dog.name} removal is pending admin approval.`);
+                    this.closeDogDetail();
+                    return;
+                }
+                Components.toast(`${dog.name} deleted from kennel`);
+                this.closeDogDetail();
+                this.navigate('mydogs');
+            });
         };
     },
 
@@ -1361,15 +1436,34 @@ const App = {
             }
 
             if (recordId) {
-                KennelData.updateRecord(dogId, recordType, recordId, fieldMap);
-                Components.toast('Record updated!');
+                KennelData.updateRecord(dogId, recordType, recordId, fieldMap).then((result) => {
+                    if (!result || !result.ok) {
+                        Components.toast(result && result.error ? result.error : 'Unable to update record', 'error');
+                        return;
+                    }
+                    if (result.pending) {
+                        Components.toast('Record update is pending admin approval.');
+                    } else {
+                        Components.toast('Record updated!');
+                    }
+                    document.getElementById('recordModal').classList.remove('open');
+                    this.openDogDetail(dogId);
+                });
             } else {
-                KennelData.addRecord(dogId, recordType, fieldMap);
-                Components.toast('Record added!');
+                KennelData.addRecord(dogId, recordType, fieldMap).then((result) => {
+                    if (!result || !result.ok) {
+                        Components.toast(result && result.error ? result.error : 'Unable to add record', 'error');
+                        return;
+                    }
+                    if (result.pending) {
+                        Components.toast('Record submission is pending admin approval.');
+                    } else {
+                        Components.toast('Record added!');
+                    }
+                    document.getElementById('recordModal').classList.remove('open');
+                    this.openDogDetail(dogId);
+                });
             }
-
-            document.getElementById('recordModal').classList.remove('open');
-            this.openDogDetail(dogId);
         });
 
         document.getElementById('recordModalCancel').addEventListener('click', () => {
@@ -1392,10 +1486,19 @@ const App = {
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete this record for ${dog.name}?`;
         document.getElementById('deleteModal').classList.add('open');
         document.getElementById('deleteModalConfirm').onclick = () => {
-            KennelData.deleteRecord(dogId, recordType, recordId);
-            document.getElementById('deleteModal').classList.remove('open');
-            Components.toast('Record deleted');
-            this.openDogDetail(dogId);
+            KennelData.deleteRecord(dogId, recordType, recordId).then((result) => {
+                document.getElementById('deleteModal').classList.remove('open');
+                if (!result || !result.ok) {
+                    Components.toast(result && result.error ? result.error : 'Unable to delete record', 'error');
+                    return;
+                }
+                if (result.pending) {
+                    Components.toast('Record deletion is pending admin approval.');
+                } else {
+                    Components.toast('Record deleted');
+                }
+                this.openDogDetail(dogId);
+            });
         };
     },
 

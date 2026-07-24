@@ -511,17 +511,55 @@ class KennelHandler(BaseHTTPRequestHandler):
         conn.close()
         return approval_id
 
+    def _queue_staff_submission(self, actor, entity_type, action, payload, summary=None):
+        envelope = {
+            "data": payload,
+            "summary": summary or {},
+        }
+        if action in {"update", "delete"}:
+            envelope["targetId"] = (summary or {}).get("id")
+        approval_id = self._create_pending_approval(actor, entity_type, envelope, action=action)
+        return {
+            "ok": True,
+            "pending": True,
+            "approvalId": approval_id,
+            "message": "Your update has been submitted for admin approval.",
+        }
+
     def _apply_pending_approval(self, approval_row):
         payload = json.loads(approval_row["payload"]) if approval_row["payload"] else {}
         entity_type = approval_row["entity_type"]
+        action = approval_row["action"] or "create"
+        entity_payload = payload.get("data") if isinstance(payload, dict) and "data" in payload else payload
+        target_id = payload.get("targetId") if isinstance(payload, dict) else None
         if entity_type == "dog":
-            return self._insert_dog_record(payload)
+            if action == "create":
+                return self._insert_dog_record(entity_payload)
+            if action == "update":
+                return self._update_dog_record(target_id, entity_payload)
+            if action == "delete":
+                return self._delete_dog_record(target_id)
         if entity_type == "puppy":
-            return self._insert_puppy_record(payload)
+            if action == "create":
+                return self._insert_puppy_record(entity_payload)
+            if action == "update":
+                return self._update_puppy_record(target_id, entity_payload)
+            if action == "delete":
+                return self._delete_puppy_record(target_id)
         if entity_type == "finance":
-            return self._insert_finance_record(payload)
+            if action == "create":
+                return self._insert_finance_record(entity_payload)
+            if action == "delete":
+                return self._delete_finance_record(target_id)
         if entity_type == "event":
-            return self._insert_event_record(payload)
+            if action == "create":
+                return self._insert_event_record(entity_payload)
+            if action == "delete":
+                return self._delete_event_record(target_id)
+        if entity_type == "daily_report" and action == "create":
+            return self._insert_daily_report_record(entity_payload)
+        if entity_type == "activity" and action == "create":
+            return self._insert_activity_record(entity_payload)
         return None
 
     def _insert_dog_record(self, payload):
@@ -661,6 +699,236 @@ class KennelHandler(BaseHTTPRequestHandler):
         conn.commit()
         conn.close()
         return {"id": event_id, "title": title, "date": date_value}
+
+    def _update_dog_record(self, dog_id, payload):
+        if not dog_id:
+            raise ValueError("A dog id is required for updates.")
+        name = str(payload.get("name", "")).strip()
+        breed = str(payload.get("breed", "")).strip()
+        gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+        if not name or not breed:
+            raise ValueError("A dog name and breed are required.")
+        records = payload.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}
+        if not isinstance(records, dict):
+            raise ValueError("Dog records must be provided as an object.")
+        for record_type, entries in records.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                date_field = "date"
+                if record_type == "heatCycle":
+                    date_field = "startDate"
+                if record_type == "breeding" and not entry.get("expectedDate") and not entry.get("date"):
+                    raise ValueError(f"{record_type} records require a date.")
+                if not entry.get(date_field):
+                    if record_type != "breeding":
+                        raise ValueError(f"{record_type} records require a date.")
+        conn = self._connect()
+        existing = conn.execute("SELECT id FROM dogs WHERE id = ?", (dog_id,)).fetchone()
+        if not existing:
+            conn.close()
+            raise ValueError("Dog not found.")
+        duplicate = conn.execute("SELECT id FROM dogs WHERE LOWER(name)=? AND id!=?", (name.lower(), dog_id)).fetchone()
+        if duplicate:
+            conn.close()
+            raise ValueError("A dog with this name already exists.")
+        conn.execute(
+            "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
+            (
+                name,
+                breed,
+                gender,
+                payload.get("dob"),
+                payload.get("status", "Active"),
+                payload.get("weight", ""),
+                payload.get("notes", ""),
+                payload.get("value", ""),
+                int(bool(payload.get("forSale", False))),
+                payload.get("price", ""),
+                payload.get("image", ""),
+                json.dumps(records),
+                json.dumps(payload.get("attachments") or []),
+                dog_id,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {"id": dog_id, "name": name, "breed": breed, "gender": gender}
+
+    def _delete_dog_record(self, dog_id):
+        if not dog_id:
+            raise ValueError("A dog id is required for deletion.")
+        conn = self._connect()
+        row = conn.execute("SELECT id, name FROM dogs WHERE id = ?", (dog_id,)).fetchone()
+        if not row:
+            conn.close()
+            raise ValueError("Dog not found.")
+        conn.execute("DELETE FROM dogs WHERE id = ?", (dog_id,))
+        conn.commit()
+        conn.close()
+        return {"id": row[0], "name": row[1]}
+
+    def _update_puppy_record(self, puppy_id, payload):
+        if not puppy_id:
+            raise ValueError("A puppy id is required for updates.")
+        name = str(payload.get("name", "")).strip()
+        gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
+        collar_color = str(payload.get("collarColor", "")).strip()
+        if not name:
+            raise ValueError("A puppy name is required.")
+        if not gender:
+            raise ValueError("Please choose a gender for the puppy.")
+        conn = self._connect()
+        existing = conn.execute("SELECT id FROM puppies WHERE id = ?", (puppy_id,)).fetchone()
+        if not existing:
+            conn.close()
+            raise ValueError("Puppy not found.")
+        duplicate = conn.execute("SELECT id FROM puppies WHERE LOWER(name)=? AND id!=?", (name.lower(), puppy_id)).fetchone()
+        if duplicate:
+            conn.close()
+            raise ValueError("A puppy with this name already exists.")
+        conn.execute(
+            "UPDATE puppies SET name=?, dob=?, gender=?, collarColor=?, saleStatus=?, saleTotalAmount=?, saleReceivedAmount=?, saleUnpaidAmount=?, vaccinations=?, deworming=?, father=?, mother=?, sireGrandfather=?, sireGrandmother=?, damGrandfather=?, damGrandmother=?, ownerName=?, ownerPhone=?, ownerAddress=? WHERE id=?",
+            (
+                name,
+                payload.get("dob"),
+                gender,
+                collar_color,
+                payload.get("saleStatus", "Available"),
+                payload.get("saleTotalAmount"),
+                payload.get("saleReceivedAmount"),
+                payload.get("saleUnpaidAmount"),
+                json.dumps(payload.get("vaccinations") or []),
+                json.dumps(payload.get("deworming") or []),
+                payload.get("father", ""),
+                payload.get("mother", ""),
+                payload.get("sireGrandfather", ""),
+                payload.get("sireGrandmother", ""),
+                payload.get("damGrandfather", ""),
+                payload.get("damGrandmother", ""),
+                payload.get("ownerName", ""),
+                payload.get("ownerPhone", ""),
+                payload.get("ownerAddress", ""),
+                puppy_id,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {"id": puppy_id, "name": name, "gender": gender, "collarColor": collar_color}
+
+    def _delete_puppy_record(self, puppy_id):
+        if not puppy_id:
+            raise ValueError("A puppy id is required for deletion.")
+        conn = self._connect()
+        row = conn.execute("SELECT id, name FROM puppies WHERE id = ?", (puppy_id,)).fetchone()
+        if not row:
+            conn.close()
+            raise ValueError("Puppy not found.")
+        conn.execute("DELETE FROM puppies WHERE id = ?", (puppy_id,))
+        conn.commit()
+        conn.close()
+        return {"id": row[0], "name": row[1]}
+
+    def _delete_finance_record(self, entry_id):
+        if not entry_id:
+            raise ValueError("A finance entry id is required for deletion.")
+        conn = self._connect()
+        row = conn.execute("SELECT id, title FROM finance WHERE id = ?", (entry_id,)).fetchone()
+        if not row:
+            conn.close()
+            raise ValueError("Finance entry not found.")
+        conn.execute("DELETE FROM finance WHERE id = ?", (entry_id,))
+        conn.commit()
+        conn.close()
+        return {"id": row[0], "title": row[1]}
+
+    def _delete_event_record(self, event_id):
+        if not event_id:
+            raise ValueError("An event id is required for deletion.")
+        conn = self._connect()
+        row = conn.execute("SELECT id, title FROM events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            conn.close()
+            raise ValueError("Event not found.")
+        conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        conn.commit()
+        conn.close()
+        return {"id": row[0], "title": row[1]}
+
+    def _insert_daily_report_record(self, payload):
+        date_value = str(payload.get("date", "")).strip()
+        if not date_value:
+            raise ValueError("A report date is required.")
+        report_id = payload.get("id") or "dr" + str(int(__import__("time").time() * 1000))
+        dog_statuses = payload.get("dogStatuses") or []
+        if not isinstance(dog_statuses, list):
+            dog_statuses = []
+        puppy_statuses = payload.get("puppyStatuses") or []
+        if not isinstance(puppy_statuses, list):
+            puppy_statuses = []
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                report_id,
+                date_value,
+                payload.get("foodRemaining", ""),
+                payload.get("foodToday", ""),
+                int(bool(payload.get("kennelsWashed", False))),
+                json.dumps(dog_statuses),
+                json.dumps(puppy_statuses),
+                payload.get("visitors", ""),
+                payload.get("personInCharge", ""),
+                payload.get("medicationNotes", ""),
+                payload.get("cleaningChecklist", ""),
+                payload.get("staffComments", ""),
+                payload.get("notes", ""),
+                self._now(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "id": report_id,
+            "date": date_value,
+            "foodRemaining": payload.get("foodRemaining", ""),
+            "foodToday": payload.get("foodToday", ""),
+            "kennelsWashed": bool(payload.get("kennelsWashed", False)),
+            "dogStatuses": dog_statuses,
+            "puppyStatuses": puppy_statuses,
+            "visitors": payload.get("visitors", ""),
+            "personInCharge": payload.get("personInCharge", ""),
+            "medicationNotes": payload.get("medicationNotes", ""),
+            "cleaningChecklist": payload.get("cleaningChecklist", ""),
+            "staffComments": payload.get("staffComments", ""),
+            "notes": payload.get("notes", ""),
+            "createdAt": self._now(),
+        }
+
+    def _insert_activity_record(self, payload):
+        activity_id = payload.get("id") or "a" + str(int(__import__("time").time() * 1000))
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO activities (id, type, text, color, time) VALUES (?, ?, ?, ?, ?)",
+            (
+                activity_id,
+                payload.get("type", "info"),
+                payload.get("text", ""),
+                payload.get("color", "blue"),
+                payload.get("time") or self._now(),
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "id": activity_id,
+            "type": payload.get("type", "info"),
+            "text": payload.get("text", ""),
+            "color": payload.get("color", "blue"),
+            "time": payload.get("time") or self._now(),
+        }
 
     def _ensure_backup_dir(self):
         backup_dir = ROOT / "backups"
@@ -874,13 +1142,51 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "items": payload})
             return
 
+        if path == "/api/my-submissions" and method == "GET":
+            user = self._require_auth()
+            if not user:
+                return
+            conn = self._connect()
+            rows = conn.execute(
+                "SELECT id, entity_type, action, payload, status, createdAt, reviewedAt, reviewedBy, reviewNotes FROM pending_approvals WHERE actor_id = ? ORDER BY createdAt DESC LIMIT 100",
+                (str(user.get("id")),),
+            ).fetchall()
+            conn.close()
+            items = []
+            for row in rows:
+                raw_payload = json.loads(row[3]) if row[3] else {}
+                if isinstance(raw_payload, dict) and "data" in raw_payload:
+                    data_payload = raw_payload.get("data") or {}
+                    summary = raw_payload.get("summary") or {}
+                else:
+                    data_payload = raw_payload if isinstance(raw_payload, dict) else {}
+                    summary = {}
+                label = summary.get("name") or summary.get("title") or data_payload.get("name") or data_payload.get("title") or data_payload.get("date") or row[1]
+                items.append(
+                    {
+                        "id": row[0],
+                        "entityType": row[1],
+                        "action": row[2],
+                        "status": row[4],
+                        "createdAt": row[5],
+                        "reviewedAt": row[6],
+                        "reviewedBy": row[7],
+                        "reviewNotes": row[8],
+                        "label": label,
+                    }
+                )
+            self._send_json(200, items)
+            return
+
         if path.startswith("/api/pending-approvals/") and path.endswith("/approve") and method == "POST":
             user = self._require_auth()
             if not self._require_role(user, {"admin", "reviewer"}):
                 return
             approval_id = path.split("/", 4)[3]
+            approve_payload = self._parse_json(body)
+            notes = str(approve_payload.get("notes", "Approved")).strip() or "Approved"
             conn = self._connect()
-            row = conn.execute("SELECT id, entity_type, payload FROM pending_approvals WHERE id = ? AND status = 'pending'", (approval_id,)).fetchone()
+            row = conn.execute("SELECT id, entity_type, action, payload FROM pending_approvals WHERE id = ? AND status = 'pending'", (approval_id,)).fetchone()
             if not row:
                 conn.close()
                 self._send_json(404, {"ok": False, "error": "Pending approval not found."})
@@ -891,7 +1197,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.close()
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("approved", self._now(), user.get("id"), "Approved", approval_id))
+            conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("approved", self._now(), user.get("id"), notes, approval_id))
             conn.commit()
             conn.close()
             self._create_backup(label="Auto-export", source="auto")
@@ -907,6 +1213,11 @@ class KennelHandler(BaseHTTPRequestHandler):
             payload = self._parse_json(body)
             notes = str(payload.get("notes", "Rejected")).strip() or "Rejected"
             conn = self._connect()
+            row = conn.execute("SELECT id FROM pending_approvals WHERE id = ? AND status = 'pending'", (approval_id,)).fetchone()
+            if not row:
+                conn.close()
+                self._send_json(404, {"ok": False, "error": "Pending approval not found."})
+                return
             conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("rejected", self._now(), user.get("id"), notes, approval_id))
             conn.commit()
             conn.close()
@@ -1136,14 +1447,18 @@ class KennelHandler(BaseHTTPRequestHandler):
             payload = self._parse_json(body)
             if user.get("role") == "staff":
                 try:
-                    approval_id = self._create_pending_approval(user, "dog", payload)
+                    queued = self._queue_staff_submission(
+                        user,
+                        "dog",
+                        "create",
+                        payload,
+                        summary={"name": payload.get("name", ""), "id": payload.get("id")},
+                    )
                 except Exception:
-                    approval_id = None
-                if approval_id:
-                    self._log_audit(user, "submit_pending_dog", approval_id, f"Submitted dog for approval: {payload.get('name', '')}")
-                    self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                    self._send_json(500, {"ok": False, "error": "Unable to queue dog for approval."})
                     return
-                self._send_json(500, {"ok": False, "error": "Unable to queue dog for approval."})
+                self._log_audit(user, "submit_pending_dog", queued.get("approvalId"), f"Submitted dog for approval: {payload.get('name', '')}")
+                self._send_json(200, queued)
                 return
             try:
                 created = self._insert_dog_record(payload)
@@ -1159,12 +1474,20 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") == "staff":
-                self._send_json(403, {"ok": False, "error": "Access denied."})
-                return
             dog_id = path.split("/", 3)[3]
             if method == "PUT":
                 payload = self._parse_json(body)
+                if user.get("role") == "staff":
+                    queued = self._queue_staff_submission(
+                        user,
+                        "dog",
+                        "update",
+                        payload,
+                        summary={"id": dog_id, "name": payload.get("name", "")},
+                    )
+                    self._log_audit(user, "submit_pending_dog_update", queued.get("approvalId"), f"Submitted dog update for approval: {dog_id}")
+                    self._send_json(200, queued)
+                    return
                 name = str(payload.get("name", "")).strip()
                 breed = str(payload.get("breed", "")).strip()
                 gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
@@ -1222,6 +1545,17 @@ class KennelHandler(BaseHTTPRequestHandler):
                 self._log_audit(user, "update_dog", dog_id, f"Updated dog {name}")
                 self._send_json(200, {"ok": True, "dog": {**payload, "name": name, "breed": breed, "gender": gender}})
                 return
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "dog",
+                    "delete",
+                    {},
+                    summary={"id": dog_id, "name": dog_id},
+                )
+                self._log_audit(user, "submit_pending_dog_delete", queued.get("approvalId"), f"Submitted dog deletion for approval: {dog_id}")
+                self._send_json(200, queued)
+                return
             conn = self._connect()
             conn.execute("DELETE FROM dogs WHERE id = ?", (dog_id,))
             conn.commit()
@@ -1270,9 +1604,15 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             payload = self._parse_json(body)
             if user.get("role") == "staff":
-                approval_id = self._create_pending_approval(user, "puppy", payload)
-                self._log_audit(user, "submit_pending_puppy", approval_id, f"Submitted puppy for approval: {payload.get('name', '')}")
-                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                queued = self._queue_staff_submission(
+                    user,
+                    "puppy",
+                    "create",
+                    payload,
+                    summary={"name": payload.get("name", ""), "id": payload.get("id")},
+                )
+                self._log_audit(user, "submit_pending_puppy", queued.get("approvalId"), f"Submitted puppy for approval: {payload.get('name', '')}")
+                self._send_json(200, queued)
                 return
             try:
                 created = self._insert_puppy_record(payload)
@@ -1290,10 +1630,18 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             puppy_id = path.split("/", 3)[3]
             if method == "PUT":
-                if user.get("role") == "staff":
-                    self._send_json(403, {"ok": False, "error": "Access denied."})
-                    return
                 payload = self._parse_json(body)
+                if user.get("role") == "staff":
+                    queued = self._queue_staff_submission(
+                        user,
+                        "puppy",
+                        "update",
+                        payload,
+                        summary={"id": puppy_id, "name": payload.get("name", "")},
+                    )
+                    self._log_audit(user, "submit_pending_puppy_update", queued.get("approvalId"), f"Submitted puppy update for approval: {puppy_id}")
+                    self._send_json(200, queued)
+                    return
                 name = str(payload.get("name", "")).strip()
                 gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
                 collar_color = str(payload.get("collarColor", "")).strip()
@@ -1340,6 +1688,17 @@ class KennelHandler(BaseHTTPRequestHandler):
                 self._log_audit(user, "update_puppy", puppy_id, f"Updated puppy {name}")
                 self._send_json(200, {"ok": True, "puppy": {**payload, "id": puppy_id, "name": name, "gender": gender}})
                 return
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "puppy",
+                    "delete",
+                    {},
+                    summary={"id": puppy_id, "name": puppy_id},
+                )
+                self._log_audit(user, "submit_pending_puppy_delete", queued.get("approvalId"), f"Submitted puppy deletion for approval: {puppy_id}")
+                self._send_json(200, queued)
+                return
             conn = self._connect()
             conn.execute("DELETE FROM puppies WHERE id = ?", (puppy_id,))
             conn.commit()
@@ -1366,9 +1725,16 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             if user.get("role") == "staff":
-                approval_id = self._create_pending_approval(user, "finance", self._parse_json(body))
-                self._log_audit(user, "submit_pending_finance", approval_id, f"Submitted finance entry for approval")
-                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                finance_payload = self._parse_json(body)
+                queued = self._queue_staff_submission(
+                    user,
+                    "finance",
+                    "create",
+                    finance_payload,
+                    summary={"title": finance_payload.get("title", ""), "id": finance_payload.get("id")},
+                )
+                self._log_audit(user, "submit_pending_finance", queued.get("approvalId"), "Submitted finance entry for approval")
+                self._send_json(200, queued)
                 return
             if not self._require_role(user, {"admin"}):
                 return
@@ -1385,9 +1751,22 @@ class KennelHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/finance/") and method == "DELETE":
             user = self._require_auth()
-            if not self._require_role(user, {"admin"}):
+            if not user:
                 return
             entry_id = path.split("/", 3)[3]
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "finance",
+                    "delete",
+                    {},
+                    summary={"id": entry_id, "title": entry_id},
+                )
+                self._log_audit(user, "submit_pending_finance_delete", queued.get("approvalId"), f"Submitted finance deletion for approval: {entry_id}")
+                self._send_json(200, queued)
+                return
+            if not self._require_role(user, {"admin"}):
+                return
             conn = self._connect()
             conn.execute("DELETE FROM finance WHERE id = ?", (entry_id,))
             conn.commit()
@@ -1437,6 +1816,17 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             payload = self._parse_json(body)
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "daily_report",
+                    "create",
+                    payload,
+                    summary={"date": payload.get("date", "")},
+                )
+                self._log_audit(user, "submit_pending_daily_report", queued.get("approvalId"), f"Submitted daily report for approval: {payload.get('date', '')}")
+                self._send_json(200, queued)
+                return
             date_value = str(payload.get("date", "")).strip()
             if not date_value:
                 self._send_json(400, {"ok": False, "error": "A report date is required."})
@@ -1495,9 +1885,15 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             payload = self._parse_json(body)
             if user.get("role") == "staff":
-                approval_id = self._create_pending_approval(user, "event", payload)
-                self._log_audit(user, "submit_pending_event", approval_id, f"Submitted event for approval")
-                self._send_json(200, {"ok": True, "pending": True, "approvalId": approval_id, "message": "Your update has been submitted for admin approval."})
+                queued = self._queue_staff_submission(
+                    user,
+                    "event",
+                    "create",
+                    payload,
+                    summary={"title": payload.get("title", ""), "id": payload.get("id")},
+                )
+                self._log_audit(user, "submit_pending_event", queued.get("approvalId"), "Submitted event for approval")
+                self._send_json(200, queued)
                 return
             try:
                 created = self._insert_event_record(payload)
@@ -1514,6 +1910,17 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             event_id = path.split("/", 3)[3]
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "event",
+                    "delete",
+                    {},
+                    summary={"id": event_id, "title": event_id},
+                )
+                self._log_audit(user, "submit_pending_event_delete", queued.get("approvalId"), f"Submitted event deletion for approval: {event_id}")
+                self._send_json(200, queued)
+                return
             conn = self._connect()
             conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
             conn.commit()
@@ -1536,6 +1943,17 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             payload = self._parse_json(body)
+            if user.get("role") == "staff":
+                queued = self._queue_staff_submission(
+                    user,
+                    "activity",
+                    "create",
+                    payload,
+                    summary={"title": payload.get("text", ""), "id": payload.get("id")},
+                )
+                self._log_audit(user, "submit_pending_activity", queued.get("approvalId"), "Submitted activity for approval")
+                self._send_json(200, queued)
+                return
             activity_id = payload.get("id") or "a" + str(int(__import__("time").time() * 1000))
             conn = self._connect()
             conn.execute("INSERT INTO activities (id, type, text, color, time) VALUES (?, ?, ?, ?, ?)", (activity_id, payload.get("type", "info"), payload.get("text", ""), payload.get("color", "blue"), payload.get("time") or self._now()))

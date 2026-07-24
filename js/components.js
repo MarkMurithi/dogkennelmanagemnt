@@ -467,6 +467,8 @@ const Components = {
         var dogs = KennelData.getDogs();
         var activities = KennelData.getActivities(8);
         var alerts = KennelData.getAlerts().slice(0, 5);
+        var mySubmissions = KennelData.getMySubmissions().slice(0, 6);
+        var role = KennelData.getCurrentUserRole();
 
         var alertsBadge = '';
         if (alerts.length > 0) {
@@ -612,6 +614,25 @@ const Components = {
 
         var ageEmptyHtml = stats.total === 0 ? '<p style="text-align:center;color:var(--gray-400);padding:20px">No age data available</p>' : '';
         var emptyStateHtml = stats.total === 0 ? '<div class="card section-card full-width"><div class="card-body" style="text-align:center;padding:36px 20px;color:var(--gray-500)"><i class="fas fa-dog" style="font-size:2.2rem;margin-bottom:10px;display:block"></i><p style="margin-bottom:10px">Your kennel is empty. Start by adding your first dog and then build out health, breeding, and puppy records.</p><button class="btn btn-primary" onclick="App.showAddDog()"><i class="fas fa-plus"></i> Add First Dog</button></div></div>' : '';
+        var submissionsCardHtml = '';
+        if (role === 'staff') {
+            var submissionRows = '';
+            if (!mySubmissions.length) {
+                submissionRows = '<p style="color:var(--gray-400)">No submissions yet.</p>';
+            } else {
+                for (var submissionIndex = 0; submissionIndex < mySubmissions.length; submissionIndex++) {
+                    var submission = mySubmissions[submissionIndex] || {};
+                    var submissionStatus = submission.status || 'pending';
+                    var pillClass = submissionStatus === 'approved' ? 'active' : '';
+                    var noteText = submission.reviewNotes ? ('<div style="font-size:0.8rem;color:var(--gray-500);margin-top:4px">' + submission.reviewNotes + '</div>') : '';
+                    submissionRows += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--gray-100)">' +
+                        '<div><strong>' + (submission.label || submission.entityType || 'Submission') + '</strong><div style="font-size:0.85rem;color:var(--gray-500)">' + (submission.action || 'create') + ' • ' + (submission.createdAt ? new Date(submission.createdAt).toLocaleDateString() : 'just now') + '</div>' + noteText + '</div>' +
+                        '<span class="status-pill ' + pillClass + '">' + submissionStatus + '</span>' +
+                        '</div>';
+                }
+            }
+            submissionsCardHtml = '<div class="card section-card full-width"><div class="card-header"><h3><i class="fas fa-clipboard-list"></i> My Submission Status</h3></div><div class="card-body">' + submissionRows + '</div></div>';
+        }
 
         return '<div class="page-shell" id="pageOverview">' +
             '<section class="page-hero">' +
@@ -669,6 +690,7 @@ const Components = {
             '<div class="card-body"><div class="breed-list">' + breedChipsHtml + '</div></div></div>' +
             '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clock"></i> Recent Activity</h3></div>' +
             '<div class="card-body"><div class="activity-list">' + activityHtml + '</div></div></div>' +
+            submissionsCardHtml +
             emptyStateHtml +
             '<div class="card section-card full-width"><div class="card-header"><h3><i class="far fa-calendar-check"></i> Upcoming Events</h3></div>' +
             '<div class="card-body">' + upcomingTableHtml + '</div></div>' +
@@ -967,7 +989,9 @@ const Components = {
                 var approval = pendingApprovals[j];
                 var label = approval.entityType || 'item';
                 var payload = approval.payload || {};
-                var summaryText = payload.name || payload.title || payload.email || 'Pending item';
+                var payloadData = payload.data || payload;
+                var payloadSummary = payload.summary || {};
+                var summaryText = payloadSummary.name || payloadSummary.title || payloadData.name || payloadData.title || payloadData.email || payloadData.date || 'Pending item';
                 pendingRows += '<div class="card section-card" style="margin-bottom:10px">' +
                     '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
                     '<div><strong>' + summaryText + '</strong><br><span style="color:var(--gray-500);font-size:0.9rem">' + label + ' • submitted by ' + (approval.actorName || 'staff') + '</span></div>' +

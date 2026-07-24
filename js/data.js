@@ -8,12 +8,14 @@ const KennelData = {
     _dailyReports: [],
     _users: [],
     _pendingApprovals: [],
+    _mySubmissions: [],
+    _submissionStatusCache: {},
     _currentUser: null,
     _serverState: { status: 'online', message: '' },
     _listeners: [],
     _pendingWrites: [],
     _isFlushingPendingWrites: false,
-    _DATA_VERSION: 12,
+    _DATA_VERSION: 13,
     apiBase: (function() {
         if (typeof window === 'undefined' || !window.location) {
             return 'http://127.0.0.1:8001/api';
@@ -41,7 +43,7 @@ const KennelData = {
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                if (parsed._version === this._DATA_VERSION || parsed._version === 10 || parsed._version === 9) {
+                if (parsed._version === this._DATA_VERSION || parsed._version === 12 || parsed._version === 10 || parsed._version === 9) {
                     this._dogs = parsed.dogs || [];
                     this._puppies = parsed.puppies || [];
                     this._activities = parsed.activities || [];
@@ -50,6 +52,7 @@ const KennelData = {
                     this._dailyReports = Array.isArray(parsed.dailyReports) ? parsed.dailyReports : [];
                     this._users = Array.isArray(parsed.users) ? parsed.users : [];
                     this._pendingApprovals = Array.isArray(parsed.pendingApprovals) ? parsed.pendingApprovals : [];
+                    this._mySubmissions = Array.isArray(parsed.mySubmissions) ? parsed.mySubmissions : [];
                     this._currentUser = parsed.currentUser || this._restoreAuthState();
                 } else {
                     this._resetEmptyState();
@@ -65,6 +68,7 @@ const KennelData = {
             this._validateSession().then(function(isValid) {
                 if (isValid) {
                     this._syncFromServer();
+                    this._primeSubmissionStatusCache();
                     this._flushPendingWrites();
                 }
             }.bind(this));
@@ -322,9 +326,11 @@ const KennelData = {
             this._syncCollection('/finance', '_finance', { clearOnForbidden: true }),
             this._syncCollection('/events', '_events'),
             this._syncCollection('/daily-reports', '_dailyReports'),
-            this._syncCollection('/activities', '_activities')
+            this._syncCollection('/activities', '_activities'),
+            this._syncCollection('/my-submissions', '_mySubmissions')
         ];
         return Promise.all(requests).then(function() {
+            this._primeSubmissionStatusCache();
             this._notify();
         }.bind(this));
     },
@@ -338,6 +344,8 @@ const KennelData = {
         this._dailyReports = [];
         this._users = [];
         this._pendingApprovals = [];
+        this._mySubmissions = [];
+        this._submissionStatusCache = {};
         this._currentUser = null;
         this._save();
     },
@@ -353,6 +361,7 @@ const KennelData = {
             dailyReports: this._dailyReports,
             users: this._users,
             pendingApprovals: this._pendingApprovals,
+            mySubmissions: this._mySubmissions,
             currentUser: this._currentUser
         }));
     },
@@ -480,6 +489,12 @@ const KennelData = {
                 this._notify();
                 return result;
             }
+            if (result.pending) {
+                this._puppies[idx] = previous;
+                this._save();
+                this._notify();
+                return result;
+            }
             if (result.puppy) {
                 this._puppies[idx] = Object.assign({}, this._puppies[idx], result.puppy);
                 this._save();
@@ -495,10 +510,20 @@ const KennelData = {
     },
 
     deletePuppy(id) {
-        this._puppies = this._puppies.filter(function(p) { return p.id !== id; });
-        this._save();
-        this._notify();
-        this._request('/puppies/' + id, { method: 'DELETE' }).catch(function() {});
+        var idx = this._puppies.findIndex(function(p) { return p.id === id; });
+        if (idx === -1) return Promise.resolve({ ok: false, error: 'Puppy not found.' });
+        const existing = this._puppies[idx];
+        return this._request('/puppies/' + id, { method: 'DELETE' }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to remove puppy right now.' };
+            }
+            this._puppies = this._puppies.filter(function(p) { return p.id !== id; });
+            this._save();
+            this._notify();
+            return Object.assign({}, result, { puppy: existing });
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to remove puppy right now.' };
+        });
     },
 
     getDog(id) { return this._dogs.find(function(d) { return d.id === id; }); },
@@ -548,6 +573,12 @@ const KennelData = {
                 this._notify();
                 return result;
             }
+            if (result.pending) {
+                this._dogs[idx] = previous;
+                this._save();
+                this._notify();
+                return result;
+            }
             if (result.dog) {
                 this._dogs[idx] = Object.assign({}, this._dogs[idx], result.dog);
                 this._save();
@@ -564,11 +595,19 @@ const KennelData = {
 
     deleteDog(id) {
         var dog = this.getDog(id);
-        this._dogs = this._dogs.filter(function(d) { return d.id !== id; });
-        this._addActivity('deleted', '<strong>' + dog.name + '</strong> removed from kennel', 'red');
-        this._save();
-        this._notify();
-        this._request('/dogs/' + id, { method: 'DELETE' }).catch(function() {});
+        if (!dog) return Promise.resolve({ ok: false, error: 'Dog not found.' });
+        return this._request('/dogs/' + id, { method: 'DELETE' }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to remove dog right now.' };
+            }
+            this._dogs = this._dogs.filter(function(d) { return d.id !== id; });
+            this._addActivity('deleted', '<strong>' + dog.name + '</strong> removed from kennel', 'red');
+            this._save();
+            this._notify();
+            return Object.assign({}, result, { dog: dog });
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to remove dog right now.' };
+        });
     },
 
     resetAll() {
@@ -651,10 +690,19 @@ const KennelData = {
     },
 
     deleteFinanceEntry(id) {
-        this._finance = this._finance.filter(function(item) { return item.id !== id; });
-        this._save();
-        this._notify();
-        this._request('/finance/' + id, { method: 'DELETE' }).catch(function() {});
+        var entry = this.getFinanceEntry(id);
+        if (!entry) return Promise.resolve({ ok: false, error: 'Finance entry not found.' });
+        return this._request('/finance/' + id, { method: 'DELETE' }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to remove finance entry right now.' };
+            }
+            this._finance = this._finance.filter(function(item) { return item.id !== id; });
+            this._save();
+            this._notify();
+            return Object.assign({}, result, { entry: entry });
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to remove finance entry right now.' };
+        });
     },
 
     getFinanceSummary() {
@@ -803,6 +851,62 @@ const KennelData = {
 
     getPendingApprovals() {
         return this._pendingApprovals.slice();
+    },
+
+    getMySubmissions() {
+        return this._mySubmissions.slice();
+    },
+
+    _primeSubmissionStatusCache() {
+        this._submissionStatusCache = {};
+        this._mySubmissions.forEach(function(item) {
+            if (item && item.id) {
+                this._submissionStatusCache[item.id] = item.status || 'pending';
+            }
+        }.bind(this));
+    },
+
+    loadMySubmissions(options) {
+        const shouldPrime = Boolean(options && options.primeStatusCache);
+        return this._request('/my-submissions').then(function(result) {
+            if (Array.isArray(result)) {
+                this._mySubmissions = result;
+                if (shouldPrime) {
+                    this._primeSubmissionStatusCache();
+                }
+                this._save();
+                this._notify();
+                return result;
+            }
+            this._mySubmissions = [];
+            if (shouldPrime) {
+                this._primeSubmissionStatusCache();
+            }
+            this._save();
+            this._notify();
+            return [];
+        }.bind(this)).catch(function() {
+            return [];
+        });
+    },
+
+    pollSubmissionUpdates() {
+        const previous = Object.assign({}, this._submissionStatusCache || {});
+        return this.loadMySubmissions().then(function(items) {
+            const updates = [];
+            (items || []).forEach(function(item) {
+                if (!item || !item.id) {
+                    return;
+                }
+                const current = item.status || 'pending';
+                const prior = previous[item.id];
+                if (prior && prior !== current && (current === 'approved' || current === 'rejected')) {
+                    updates.push(item);
+                }
+            });
+            this._primeSubmissionStatusCache();
+            return updates;
+        }.bind(this));
     },
 
     loadPendingApprovals() {
@@ -1029,47 +1133,79 @@ const KennelData = {
 
     addRecord(dogId, recordType, record) {
         var dog = this.getDog(dogId);
-        if (!dog) return null;
+        if (!dog) return Promise.resolve({ ok: false, error: 'Dog not found.' });
         record.id = 'r' + Date.now();
-        if (!dog.records) dog.records = { health: [], vaccination: [], deworming: [], breeding: [], heatCycle: [], training: [] };
-        if (!dog.records[recordType]) dog.records[recordType] = [];
-        dog.records[recordType].push(record);
-        var labels = { health: 'Health Record', vaccination: 'Vaccination', deworming: 'Deworming', breeding: 'Breeding Record', heatCycle: 'Heat Cycle', training: 'Training Record' };
-        this._addActivity('record', '<strong>' + dog.name + '</strong> - ' + (labels[recordType] || recordType) + ' added', 'blue');
-        this._save();
-        this._notify();
-        this._request('/dogs/' + dogId, {
+        const nextDog = Object.assign({}, dog);
+        const nextRecords = Object.assign({ health: [], vaccination: [], deworming: [], breeding: [], heatCycle: [], training: [] }, dog.records || {});
+        if (!nextRecords[recordType]) nextRecords[recordType] = [];
+        nextRecords[recordType] = nextRecords[recordType].slice();
+        nextRecords[recordType].push(record);
+        nextDog.records = nextRecords;
+        return this._request('/dogs/' + dogId, {
             method: 'PUT',
-            body: JSON.stringify(dog)
-        }).catch(function() {});
-        return record;
+            body: JSON.stringify(nextDog)
+        }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to save record right now.' };
+            }
+            dog.records = nextRecords;
+            var labels = { health: 'Health Record', vaccination: 'Vaccination', deworming: 'Deworming', breeding: 'Breeding Record', heatCycle: 'Heat Cycle', training: 'Training Record' };
+            this._addActivity('record', '<strong>' + dog.name + '</strong> - ' + (labels[recordType] || recordType) + ' added', 'blue');
+            this._save();
+            this._notify();
+            return { ok: true, record: record };
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to save record right now.' };
+        });
     },
 
     updateRecord(dogId, recordType, recordId, updates) {
         var dog = this.getDog(dogId);
-        if (!dog || !dog.records || !dog.records[recordType]) return null;
+        if (!dog || !dog.records || !dog.records[recordType]) return Promise.resolve({ ok: false, error: 'Record not found.' });
         var idx = dog.records[recordType].findIndex(function(r) { return r.id === recordId; });
-        if (idx === -1) return null;
-        dog.records[recordType][idx] = Object.assign({}, dog.records[recordType][idx], updates);
-        this._save();
-        this._notify();
-        this._request('/dogs/' + dogId, {
+        if (idx === -1) return Promise.resolve({ ok: false, error: 'Record not found.' });
+        const nextDog = Object.assign({}, dog);
+        const nextRecords = Object.assign({ health: [], vaccination: [], deworming: [], breeding: [], heatCycle: [], training: [] }, dog.records || {});
+        nextRecords[recordType] = (nextRecords[recordType] || []).slice();
+        nextRecords[recordType][idx] = Object.assign({}, nextRecords[recordType][idx], updates);
+        nextDog.records = nextRecords;
+        return this._request('/dogs/' + dogId, {
             method: 'PUT',
-            body: JSON.stringify(dog)
-        }).catch(function() {});
-        return dog.records[recordType][idx];
+            body: JSON.stringify(nextDog)
+        }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to update record right now.' };
+            }
+            dog.records[recordType][idx] = nextRecords[recordType][idx];
+            this._save();
+            this._notify();
+            return { ok: true, record: dog.records[recordType][idx] };
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to update record right now.' };
+        });
     },
 
     deleteRecord(dogId, recordType, recordId) {
         var dog = this.getDog(dogId);
-        if (!dog || !dog.records || !dog.records[recordType]) return;
-        dog.records[recordType] = dog.records[recordType].filter(function(r) { return r.id !== recordId; });
-        this._save();
-        this._notify();
-        this._request('/dogs/' + dogId, {
+        if (!dog || !dog.records || !dog.records[recordType]) return Promise.resolve({ ok: false, error: 'Record not found.' });
+        const nextDog = Object.assign({}, dog);
+        const nextRecords = Object.assign({ health: [], vaccination: [], deworming: [], breeding: [], heatCycle: [], training: [] }, dog.records || {});
+        nextRecords[recordType] = (nextRecords[recordType] || []).filter(function(r) { return r.id !== recordId; });
+        nextDog.records = nextRecords;
+        return this._request('/dogs/' + dogId, {
             method: 'PUT',
-            body: JSON.stringify(dog)
-        }).catch(function() {});
+            body: JSON.stringify(nextDog)
+        }).then(function(result) {
+            if (!result || !result.ok || result.pending) {
+                return result || { ok: false, error: 'Unable to delete record right now.' };
+            }
+            dog.records[recordType] = nextRecords[recordType];
+            this._save();
+            this._notify();
+            return { ok: true };
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to delete record right now.' };
+        });
     },
 
     getActivities(limit) {
@@ -1200,12 +1336,20 @@ const KennelData = {
             method: 'POST',
             body: JSON.stringify(entry)
         }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to save report right now.' };
+            }
+            if (result.pending) {
+                return result;
+            }
             if (result && result.report) {
                 KennelData._dailyReports.unshift(result.report);
                 KennelData._save();
                 KennelData._notify();
             }
             return result;
+        }).catch(function() {
+            return { ok: false, error: 'Unable to save report right now.' };
         });
     },
 
