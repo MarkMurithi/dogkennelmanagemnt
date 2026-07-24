@@ -866,24 +866,52 @@ const KennelData = {
         }.bind(this));
     },
 
+    _areSubmissionListsEqual(left, right) {
+        if (!Array.isArray(left) || !Array.isArray(right)) {
+            return false;
+        }
+        if (left.length !== right.length) {
+            return false;
+        }
+        for (var index = 0; index < left.length; index++) {
+            var a = left[index] || {};
+            var b = right[index] || {};
+            if ((a.id || '') !== (b.id || '')) return false;
+            if ((a.status || '') !== (b.status || '')) return false;
+            if ((a.reviewNotes || '') !== (b.reviewNotes || '')) return false;
+            if ((a.reviewedAt || '') !== (b.reviewedAt || '')) return false;
+            if ((a.label || '') !== (b.label || '')) return false;
+        }
+        return true;
+    },
+
     loadMySubmissions(options) {
         const shouldPrime = Boolean(options && options.primeStatusCache);
+        const silentIfUnchanged = options && options.silentIfUnchanged !== undefined
+            ? Boolean(options.silentIfUnchanged)
+            : false;
         return this._request('/my-submissions').then(function(result) {
             if (Array.isArray(result)) {
+                const changed = !this._areSubmissionListsEqual(this._mySubmissions, result);
                 this._mySubmissions = result;
                 if (shouldPrime) {
                     this._primeSubmissionStatusCache();
                 }
-                this._save();
-                this._notify();
+                if (changed || !silentIfUnchanged) {
+                    this._save();
+                    this._notify();
+                }
                 return result;
             }
+            const hadItems = this._mySubmissions.length > 0;
             this._mySubmissions = [];
             if (shouldPrime) {
                 this._primeSubmissionStatusCache();
             }
-            this._save();
-            this._notify();
+            if (hadItems || !silentIfUnchanged) {
+                this._save();
+                this._notify();
+            }
             return [];
         }.bind(this)).catch(function() {
             return [];
@@ -892,7 +920,7 @@ const KennelData = {
 
     pollSubmissionUpdates() {
         const previous = Object.assign({}, this._submissionStatusCache || {});
-        return this.loadMySubmissions().then(function(items) {
+        return this.loadMySubmissions({ silentIfUnchanged: true }).then(function(items) {
             const updates = [];
             (items || []).forEach(function(item) {
                 if (!item || !item.id) {
