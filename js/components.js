@@ -171,7 +171,15 @@ const Components = {
         }
         var nextDueHtml = '';
         if (record.nextDue) {
-            nextDueHtml = '<span style="margin-left:8px;color:var(--warning)"><i class="far fa-calendar-check"></i> Next: ' + new Date(record.nextDue).toLocaleDateString() + '</span>';
+            var dueDate = new Date(record.nextDue);
+            var todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            var dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            if (dueStart < todayStart) {
+                nextDueHtml = '<span style="margin-left:8px;color:var(--success)"><i class="fas fa-check-circle"></i> Done: ' + dueDate.toLocaleDateString() + '</span>';
+            } else {
+                nextDueHtml = '<span style="margin-left:8px;color:var(--warning)"><i class="far fa-calendar-check"></i> Due: ' + dueDate.toLocaleDateString() + '</span>';
+            }
         }
         var dateStr = '';
         if (record.date) dateStr = new Date(record.date).toLocaleDateString();

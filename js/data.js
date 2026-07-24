@@ -1094,6 +1094,7 @@ const KennelData = {
         var breeds = {};
         dogs.forEach(function(d) { breeds[d.breed] = (breeds[d.breed] || 0) + 1; });
         var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         var ageGroups = { '<1 year': 0, '1-2 years': 0, '2-5 years': 0, '5+ years': 0 };
         dogs.forEach(function(d) {
             if (!d.dob) return;
@@ -1109,7 +1110,12 @@ const KennelData = {
             Object.keys(d.records).forEach(function(type) {
                 d.records[type].forEach(function(r) {
                     var dueDate = r.nextDue || r.expectedDate || r.nextExpected;
-                    if (dueDate) upcomingEvents.push({ dogName: d.name, dogId: d.id, type: type, record: r, nextDue: dueDate });
+                    if (!dueDate) return;
+                    var due = new Date(dueDate);
+                    var dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+                    if (dueStart >= todayStart) {
+                        upcomingEvents.push({ dogName: d.name, dogId: d.id, type: type, record: r, nextDue: dueDate });
+                    }
                 });
             });
         });
@@ -1235,6 +1241,7 @@ const KennelData = {
     getAlerts() {
         var alerts = [];
         var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         var dogs = this._dogs;
         var typeLabels = { health: 'Health Check', vaccination: 'Vaccination', deworming: 'Deworming', breeding: 'Breeding', heatCycle: 'Heat Cycle', training: 'Training' };
 
@@ -1245,7 +1252,8 @@ const KennelData = {
                     var dueValue = r.nextDue || r.expectedDate || r.nextExpected;
                     if (dueValue) {
                         var dueDate = new Date(dueValue);
-                        var days = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+                        var dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+                        var days = Math.round((dueStart - todayStart) / (1000 * 60 * 60 * 24));
                         if (days <= 30 && days >= 0) {
                             alerts.push({
                                 id: 'alert-' + r.id, type: 'warning',
@@ -1253,16 +1261,9 @@ const KennelData = {
                                 dogId: d.id, dogName: d.name, recordType: type,
                                 recordTypeLabel: typeLabels[type] || type, record: r,
                                 daysUntilDue: days,
-                                message: d.name + "'s " + (typeLabels[type] || type) + ' is due in ' + days + ' days'
-                            });
-                        }
-                        if (days < 0 && days > -30) {
-                            alerts.push({
-                                id: 'alert-overdue-' + r.id, type: 'danger', severity: 'danger',
-                                dogId: d.id, dogName: d.name, recordType: type,
-                                recordTypeLabel: typeLabels[type] || type, record: r,
-                                daysUntilDue: days,
-                                message: d.name + "'s " + (typeLabels[type] || type) + ' is OVERDUE by ' + Math.abs(days) + ' days'
+                                message: days === 0
+                                    ? d.name + "'s " + (typeLabels[type] || type) + ' is due today'
+                                    : d.name + "'s " + (typeLabels[type] || type) + ' is due in ' + days + ' days'
                             });
                         }
                     }
