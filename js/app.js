@@ -447,7 +447,19 @@ const App = {
                         }
 
                         const savedPuppy = result.puppy || puppyData;
-                        if (!editingPuppyId && savedPuppy && ['Booked', 'Sold'].includes(savedPuppy.saleStatus) && (savedPuppy.saleTotalAmount || savedPuppy.saleReceivedAmount || savedPuppy.saleUnpaidAmount)) {
+                        const puppyRefId = savedPuppy.id || editingPuppyId || '';
+                        const puppySaleTag = puppyRefId ? ('auto-puppy-sale:' + puppyRefId) : '';
+                        const existingPuppySaleEntry = KennelData.getFinanceEntries().find(function(item) {
+                            if (!item || item.category !== 'Puppy Sale') {
+                                return false;
+                            }
+                            if (puppySaleTag && String(item.notes || '').indexOf(puppySaleTag) !== -1) {
+                                return true;
+                            }
+                            return item.title === ('Puppy sale - ' + savedPuppy.name) && item.related === savedPuppy.name;
+                        });
+
+                        if (savedPuppy && savedPuppy.saleStatus === 'Sold' && (savedPuppy.saleTotalAmount || savedPuppy.saleReceivedAmount || savedPuppy.saleUnpaidAmount)) {
                             const financeNotes = [];
                             financeNotes.push('Sale status: ' + savedPuppy.saleStatus);
                             if (savedPuppy.saleReceivedAmount !== null && savedPuppy.saleReceivedAmount !== undefined) {
@@ -455,6 +467,9 @@ const App = {
                             }
                             if (savedPuppy.saleUnpaidAmount !== null && savedPuppy.saleUnpaidAmount !== undefined) {
                                 financeNotes.push('Unpaid: KSh ' + Number(savedPuppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                            }
+                            if (puppySaleTag) {
+                                financeNotes.push(puppySaleTag);
                             }
 
                             const financeEntry = {
@@ -466,9 +481,30 @@ const App = {
                                 related: savedPuppy.name,
                                 notes: financeNotes.join(' • ')
                             };
-                            KennelData.addFinanceEntry(financeEntry).then(function(financeResult) {
-                                if (financeResult && !financeResult.ok) {
-                                    Components.toast(financeResult.error || 'Unable to save puppy sale entry', 'error');
+
+                            const addSaleEntry = function() {
+                                KennelData.addFinanceEntry(financeEntry).then(function(financeResult) {
+                                    if (financeResult && !financeResult.ok) {
+                                        Components.toast(financeResult.error || 'Unable to save puppy sale entry', 'error');
+                                    }
+                                });
+                            };
+
+                            if (existingPuppySaleEntry) {
+                                KennelData.deleteFinanceEntry(existingPuppySaleEntry.id).then(function(deleteResult) {
+                                    if (deleteResult && !deleteResult.ok) {
+                                        Components.toast(deleteResult.error || 'Unable to update puppy sale entry', 'error');
+                                        return;
+                                    }
+                                    addSaleEntry();
+                                });
+                            } else {
+                                addSaleEntry();
+                            }
+                        } else if (existingPuppySaleEntry) {
+                            KennelData.deleteFinanceEntry(existingPuppySaleEntry.id).then(function(deleteResult) {
+                                if (deleteResult && !deleteResult.ok) {
+                                    Components.toast(deleteResult.error || 'Unable to remove puppy sale entry', 'error');
                                 }
                             });
                         }
