@@ -1,5 +1,14 @@
 // ===== UI Components =====
 const Components = {
+    escapeHtml(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
     authPage() {
         return '<div class="auth-card">' +
             '<div class="auth-brand"><i class="fas fa-shield-alt"></i><span>Secure access to Bigpaw Kennel</span></div>' +
@@ -8,7 +17,7 @@ const Components = {
             '<form id="loginForm" class="auth-form active">' +
             '<div class="form-group"><label for="loginIdentifier">Email or username</label><input type="text" id="loginIdentifier" placeholder="Enter your email or name" required></div>' +
             '<div class="form-group"><label for="loginPassword">Password</label><input type="password" id="loginPassword" placeholder="Enter your password" required></div>' +
-            '<div class="auth-inline-row"><label class="checkbox"><input type="checkbox" id="rememberMe"> Remember me</label><button class="auth-link-btn" type="button" id="showResetLink">Forgot password?</button></div>' +
+            '<div class="auth-inline-row"><label class="checkbox"><input type="checkbox" id="rememberMe"> Remember me</label></div>' +
             '<button class="btn btn-primary" style="width:100%" type="submit"><i class="fas fa-sign-in-alt"></i> Sign in</button>' +
             '</form>' +
             '<form id="signupForm" class="auth-form">' +
@@ -18,12 +27,6 @@ const Components = {
             '<div class="form-group"><label for="signupConfirm">Confirm password</label><input type="password" id="signupConfirm" placeholder="Repeat password" required></div>' +
             '<div class="auth-inline-row"><label class="checkbox"><input type="checkbox" id="signupRememberMe"> Remember me</label></div>' +
             '<button class="btn btn-primary" style="width:100%" type="submit"><i class="fas fa-user-plus"></i> Create account</button>' +
-            '</form>' +
-            '<form id="resetForm" class="auth-form">' +
-            '<div class="form-group"><label for="resetEmail">Email</label><input type="email" id="resetEmail" placeholder="you@example.com" required></div>' +
-            '<div class="form-group"><label for="resetPassword">New password</label><input type="password" id="resetPassword" placeholder="Choose a new password" required></div>' +
-            '<div class="form-group"><label for="resetConfirm">Confirm password</label><input type="password" id="resetConfirm" placeholder="Repeat new password" required></div>' +
-            '<button class="btn btn-primary" style="width:100%" type="submit"><i class="fas fa-key"></i> Reset password</button>' +
             '</form>' +
             '</div>';
     },
@@ -43,7 +46,7 @@ const Components = {
         var toast = document.createElement('div');
         toast.className = 'toast ' + type;
         toast.innerHTML = '<i class="fas ' + (icons[type] || icons.success) + '"></i>' +
-            '<span>' + message + '</span>' +
+            '<span>' + this.escapeHtml(message) + '</span>' +
             '<button class="toast-close" onclick="this.parentElement.classList.add(\'removing\');setTimeout(function(){this.parentElement.remove()}.bind(this),300)"><i class="fas fa-times"></i></button>';
         container.appendChild(toast);
         setTimeout(function() {
@@ -62,7 +65,7 @@ const Components = {
         return '<div class="card section-card" style="margin-bottom:18px;border:1px solid rgba(194, 94, 44, 0.18);background:linear-gradient(135deg, rgba(255,247,237,0.98), rgba(255,237,213,0.96))">' +
             '<div class="card-body" style="display:flex;gap:14px;align-items:flex-start">' +
             '<div class="stat-icon yellow" style="flex-shrink:0"><i class="fas ' + icon + '"></i></div>' +
-            '<div><h3 style="margin-bottom:6px">Connection attention needed</h3><p style="margin:0;color:var(--gray-600)">' + serverState.message + '</p></div>' +
+            '<div><h3 style="margin-bottom:6px">Connection attention needed</h3><p style="margin:0;color:var(--gray-600)">' + this.escapeHtml(serverState.message) + '</p></div>' +
             '</div></div>';
     },
 
@@ -111,6 +114,11 @@ const Components = {
     },
 
     dogCard: function(dog) {
+        var safeName = this.escapeHtml(dog.name);
+        var safeBreed = this.escapeHtml(dog.breed);
+        var safeWeight = this.escapeHtml(dog.weight ? (dog.weight + ' kg') : 'N/A');
+        var safeStatus = this.escapeHtml(dog.status || 'Active');
+        var safeGender = this.escapeHtml(dog.gender || 'Unknown');
         var hasImage = dog.image && dog.image.trim() !== '';
         var age = dog.dob ? this.calculateAge(dog.dob) : 'N/A';
         var genderClass = dog.gender === 'Male' ? 'tag-male' : 'tag-female';
@@ -118,13 +126,12 @@ const Components = {
         var placeholder = '<div class="dog-card-image-placeholder"><i class="fas fa-dog"></i></div>';
         var imageHtml;
         if (hasImage) {
-            imageHtml = '<img class="dog-card-image" src="' + dog.image + '" alt="' + dog.name + '">';
+            imageHtml = '<img class="dog-card-image" src="' + this.escapeHtml(dog.image) + '" alt="' + safeName + '">';
         } else {
             imageHtml = placeholder;
         }
         var saleBadge = dog.forSale ? '<div class="dog-card-sale-badge">For Sale</div>' : '';
         var priceTag = (dog.forSale && dog.price) ? '<span class="tag tag-for-sale">KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' : '';
-        var weightHtml = dog.weight ? dog.weight + ' kg' : 'N/A';
         var imageFrame = '<div class="dog-card-image-frame">' + imageHtml + '</div>';
         var statusValue = dog.status || 'Active';
         var statusClass = 'tag-' + statusValue.toLowerCase();
@@ -134,24 +141,25 @@ const Components = {
             imageFrame +
             '<div class="dog-card-body">' +
             '<div class="dog-card-top">' +
-            '<div class="dog-card-name-wrap"><div class="dog-card-name">' + dog.name + '</div><div class="dog-card-breed">' + dog.breed + '</div></div>' +
-            '<span class="status-pill ' + statusValue.toLowerCase() + '">' + statusValue + '</span>' +
+            '<div class="dog-card-name-wrap"><div class="dog-card-name">' + safeName + '</div><div class="dog-card-breed">' + safeBreed + '</div></div>' +
+            '<span class="status-pill ' + statusValue.toLowerCase() + '">' + safeStatus + '</span>' +
             '</div>' +
             '<div class="dog-card-meta-row">' +
-            '<span class="dog-card-meta"><i class="fas ' + genderIcon + '"></i> ' + dog.gender + '</span>' +
-            '<span class="dog-card-meta"><i class="fas fa-weight-hanging"></i> ' + weightHtml + '</span>' +
+            '<span class="dog-card-meta"><i class="fas ' + genderIcon + '"></i> ' + safeGender + '</span>' +
+            '<span class="dog-card-meta"><i class="fas fa-weight-hanging"></i> ' + safeWeight + '</span>' +
             '<span class="dog-card-meta"><i class="fas fa-clock"></i> ' + age + '</span>' +
             '</div>' +
             '<div class="dog-card-tags">' +
-            '<span class="tag ' + genderClass + '"><i class="fas ' + genderIcon + '"></i> ' + dog.gender + '</span>' +
-            '<span class="tag ' + statusClass + '">' + statusValue + '</span>' +
+            '<span class="tag ' + genderClass + '"><i class="fas ' + genderIcon + '"></i> ' + safeGender + '</span>' +
+            '<span class="tag ' + statusClass + '">' + safeStatus + '</span>' +
             priceTag +
             '</div></div>' +
-            '<div class="dog-card-footer"><span>' + (dog.weight ? dog.weight + ' kg' : 'Weight N/A') + '</span><span>' + age + '</span></div>' +
+            '<div class="dog-card-footer"><span>' + safeWeight + '</span><span>' + age + '</span></div>' +
             '</div>';
     },
 
     recordItem: function(dogId, recordType, record) {
+        var safe = this.escapeHtml.bind(this);
         var details = '';
         switch(recordType) {
             case 'health':
@@ -193,8 +201,8 @@ const Components = {
 
         return '<div class="record-item ' + recordType + '">' +
             '<div class="record-info">' +
-            '<h4>' + (record.type || 'Record') + ' ' + nextDueHtml + '</h4>' +
-            '<p>' + dateStr + (details ? ' ' + details : '') + '</p>' +
+            '<h4>' + safe(record.type || 'Record') + ' ' + nextDueHtml + '</h4>' +
+            '<p>' + safe(dateStr + (details ? ' ' + details : '')) + '</p>' +
             '</div>' +
             '<div class="record-actions">' +
             '<button class="btn-text" onclick="App.editRecord(\'' + dogId + '\',\'' + recordType + '\',\'' + record.id + '\')"><i class="fas fa-edit"></i></button>' +
@@ -229,6 +237,7 @@ const Components = {
     },
 
     dailyHealthStatusList: function(dog) {
+        var safe = this.escapeHtml.bind(this);
         var entries = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
         var addButton = '<div style="margin-bottom:12px">' +
             '<button class="btn btn-primary btn-sm" onclick="App.openDailyReportForDog(\'' + dog.id + '\')">' +
@@ -252,8 +261,8 @@ const Components = {
             if (entry.personInCharge) meta.push('By: ' + entry.personInCharge);
             items += '<div class="record-item health">' +
                 '<div class="record-info">' +
-                '<h4>' + (entry.healthStatus || 'Status not set') + '</h4>' +
-                '<p>' + dateText + (meta.length ? ' • ' + meta.join(' • ') : '') + '</p>' +
+                '<h4>' + safe(entry.healthStatus || 'Status not set') + '</h4>' +
+                '<p>' + safe(dateText + (meta.length ? ' • ' + meta.join(' • ') : '')) + '</p>' +
                 '</div>' +
                 '</div>';
         }
@@ -262,10 +271,23 @@ const Components = {
     },
 
     dogDetailPanel: function(dog) {
+        var safe = this.escapeHtml.bind(this);
         var hasImage = dog.image && dog.image.trim() !== '';
+        var safeDogName = safe(dog.name || 'Dog');
+        var safeDogBreed = safe(dog.breed || 'Unknown breed');
+        var safeDogGender = safe(dog.gender || 'Unknown');
+        var safeDogWeight = safe(dog.weight ? (dog.weight + ' kg') : 'N/A');
+        var safeDogColor = safe(dog.color || 'N/A');
+        var safeDogRegistration = safe(dog.registration || 'N/A');
+        var safeDogMicrochip = safe(dog.microchip || 'N/A');
+        var safeDogOwnerName = safe(dog.ownerName || 'Not assigned');
+        var safeDogOwnerPhone = safe(dog.ownerPhone || 'N/A');
+        var safeDogOwnerAddress = safe(dog.ownerAddress || 'N/A');
+        var safeDogPedigreeNotes = safe(dog.pedigreeNotes || 'Not recorded for this dog yet');
         var age = dog.dob ? this.calculateAge(dog.dob) : 'Unknown';
         var genderIcon = dog.gender === 'Male' ? 'fa-mars' : 'fa-venus';
         var statusValue = dog.status || 'Active';
+        var safeStatusValue = safe(statusValue);
         var statusClass = 'tag-' + statusValue.toLowerCase();
         var dailyStatuses = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
         var latestDailyStatus = dailyStatuses.length > 0 ? dailyStatuses[0] : null;
@@ -290,7 +312,7 @@ const Components = {
         }
         var avatarHtml;
         if (hasImage) {
-            avatarHtml = '<img class="detail-avatar" src="' + dog.image + '" alt="' + dog.name + '">';
+            avatarHtml = '<img class="detail-avatar" src="' + safe(dog.image) + '" alt="' + safeDogName + '">';
         } else {
             avatarHtml = '<div class="detail-avatar-placeholder"><i class="fas fa-dog"></i></div>';
         }
@@ -329,14 +351,14 @@ const Components = {
 
         var notesHtml = '';
         if (dog.notes) {
-            notesHtml = sectionCard('Notes', 'fa-sticky-note', '<p class="profile-copy">' + dog.notes + '</p>', 'profile-section-notes');
+            notesHtml = sectionCard('Notes', 'fa-sticky-note', '<p class="profile-copy">' + safe(dog.notes) + '</p>', 'profile-section-notes');
         }
 
         var attachmentsHtml = '';
         if (dog.attachments && dog.attachments.length > 0) {
             var thumbs = '';
             for (var a = 0; a < dog.attachments.length; a++) {
-                thumbs += '<img class="dog-attachment-thumb" src="' + dog.attachments[a] + '" alt="Dog attachment">';
+                thumbs += '<img class="dog-attachment-thumb" src="' + safe(dog.attachments[a]) + '" alt="Dog attachment">';
             }
             attachmentsHtml = sectionCard('Documents & Photos', 'fa-images', '<div class="dog-attachments-row">' + thumbs + '</div>', 'profile-section-attachments');
         }
@@ -344,11 +366,11 @@ const Components = {
         var dailyHealthHtml = latestDailyStatus ?
             '<div class="profile-spotlight-card success">' +
                 '<div class="profile-spotlight-label">Latest daily status</div>' +
-                '<div class="profile-spotlight-title">' + (latestDailyStatus.healthStatus || 'Status not set') + '</div>' +
+                '<div class="profile-spotlight-title">' + safe(latestDailyStatus.healthStatus || 'Status not set') + '</div>' +
                 '<div class="profile-spotlight-meta">' +
-                    (latestDailyStatus.groomingStatus ? 'Grooming: ' + latestDailyStatus.groomingStatus : 'Grooming not recorded') +
+                    safe((latestDailyStatus.groomingStatus ? 'Grooming: ' + latestDailyStatus.groomingStatus : 'Grooming not recorded') +
                     (latestDailyStatus.medication ? ' • Medication: ' + latestDailyStatus.medication : '') +
-                    (latestDailyStatus.personInCharge ? ' • By: ' + latestDailyStatus.personInCharge : '') +
+                    (latestDailyStatus.personInCharge ? ' • By: ' + latestDailyStatus.personInCharge : '')) +
                 '</div>' +
                 '<div class="profile-spotlight-date">' + (latestDailyStatus.reportDate ? new Date(latestDailyStatus.reportDate).toLocaleDateString() : 'Date pending') + '</div>' +
             '</div>' :
@@ -357,10 +379,10 @@ const Components = {
         var vetHealthHtml = latestHealthRecord ?
             '<div class="profile-spotlight-card neutral">' +
                 '<div class="profile-spotlight-label">Latest vet record</div>' +
-                '<div class="profile-spotlight-title">' + (latestHealthRecord.type || 'Checkup') + '</div>' +
+                '<div class="profile-spotlight-title">' + safe(latestHealthRecord.type || 'Checkup') + '</div>' +
                 '<div class="profile-spotlight-meta">' +
-                    (latestHealthRecord.vet ? 'Vet: ' + latestHealthRecord.vet + ' • ' : '') +
-                    (latestHealthRecord.notes || 'No notes') +
+                    safe((latestHealthRecord.vet ? 'Vet: ' + latestHealthRecord.vet + ' • ' : '') +
+                    (latestHealthRecord.notes || 'No notes')) +
                 '</div>' +
                 '<div class="profile-spotlight-date">' + (latestHealthRecord.date ? new Date(latestHealthRecord.date).toLocaleDateString() : 'Date pending') + '</div>' +
             '</div>' :
@@ -371,23 +393,23 @@ const Components = {
                 fieldItem('Gender', '<i class="fas ' + genderIcon + '"></i> ' + dog.gender) +
                 fieldItem('Date of Birth', dog.dob ? new Date(dog.dob).toLocaleDateString() : 'N/A') +
                 fieldItem('Age', age) +
-                fieldItem('Weight', dog.weight ? dog.weight + ' kg' : 'N/A') +
-                fieldItem('Color', dog.color || 'N/A') +
-                fieldItem('Status', '<span class="tag ' + statusClass + '">' + statusValue + '</span>') +
-                fieldItem('Microchip', dog.microchip || 'N/A') +
-                fieldItem('Registration', dog.registration || 'N/A') +
+                fieldItem('Weight', safeDogWeight) +
+                fieldItem('Color', safeDogColor) +
+                fieldItem('Status', '<span class="tag ' + statusClass + '">' + safeStatusValue + '</span>') +
+                fieldItem('Microchip', safeDogMicrochip) +
+                fieldItem('Registration', safeDogRegistration) +
             '</div>';
 
         var pedigreeHtml =
             '<div class="profile-definition-grid">' +
-                fieldItem('Breed', dog.breed || 'N/A') +
+                fieldItem('Breed', safeDogBreed) +
                 fieldItem('Estimated value', formatMoney(dog.value)) +
                 fieldItem('Sale status', dog.forSale ? 'Listed for sale' : 'Kennel owned') +
                 fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'Not listed') +
-                fieldItem('Ownership', dog.ownerName || 'Not assigned') +
-                fieldItem('Owner contact', dog.ownerPhone || 'N/A') +
-                fieldItem('Owner address', dog.ownerAddress || 'N/A') +
-                fieldItem('Pedigree notes', dog.pedigreeNotes || 'Not recorded for this dog yet') +
+                fieldItem('Ownership', safeDogOwnerName) +
+                fieldItem('Owner contact', safeDogOwnerPhone) +
+                fieldItem('Owner address', safeDogOwnerAddress) +
+                fieldItem('Pedigree notes', safeDogPedigreeNotes) +
             '</div>';
 
         var healthSectionHtml =
@@ -404,10 +426,10 @@ const Components = {
 
         var overviewMetricsHtml =
             '<div class="profile-metrics-grid">' +
-                metricChip('fa-weight-hanging', 'Weight', dog.weight ? dog.weight + ' kg' : 'N/A') +
-                metricChip('fa-palette', 'Color', dog.color || 'N/A') +
-                metricChip('fa-id-card', 'Registration', dog.registration || 'N/A') +
-                metricChip('fa-shield-alt', 'Status', statusValue) +
+                metricChip('fa-weight-hanging', 'Weight', safeDogWeight) +
+                metricChip('fa-palette', 'Color', safeDogColor) +
+                metricChip('fa-id-card', 'Registration', safeDogRegistration) +
+                metricChip('fa-shield-alt', 'Status', safeStatusValue) +
             '</div>';
 
         return '<div class="dog-detail-overlay open" id="dogDetailOverlay" onclick="if(event.target===this)App.closeDogDetail()">' +
@@ -419,13 +441,13 @@ const Components = {
             '<div class="dog-profile-hero-content">' +
             '<div class="dog-profile-title-row">' +
             '<div class="dog-profile-title-block">' +
-            '<h2>' + dog.name + '</h2>' +
-            '<p>' + dog.breed + ' &bull; ' + age + '</p>' +
+            '<h2>' + safeDogName + '</h2>' +
+            '<p>' + safeDogBreed + ' &bull; ' + safe(age) + '</p>' +
             '</div>' +
             '<div class="dog-profile-badges">' +
-            '<span class="tag ' + statusClass + '">' + statusValue + '</span>' +
+            '<span class="tag ' + statusClass + '">' + safeStatusValue + '</span>' +
             (dog.forSale ? '<span class="tag tag-for-sale">For Sale</span>' : '<span class="tag tag-active">Kennel Owned</span>') +
-            '<span class="tag tag-retired">' + (dog.gender || 'Unknown') + '</span>' +
+            '<span class="tag tag-retired">' + safeDogGender + '</span>' +
             '</div></div>' +
             '<div class="dog-profile-actions">' +
             '<button class="btn btn-sm" onclick="App.editDog(\'' + dog.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +

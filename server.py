@@ -5,6 +5,8 @@ import json
 import os
 import secrets
 import sys
+import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +18,16 @@ ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "kennel.db"
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8001"))
-SUPER_ADMIN_EMAIL = "admin@bigpaw.com"
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "admin@bigpaw.com").strip().lower() or "admin@bigpaw.com"
+SUPER_ADMIN_BOOTSTRAP_PASSWORD = os.environ.get("SUPER_ADMIN_BOOTSTRAP_PASSWORD", "admin123")
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if origin.strip()]
+
+AUTH_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("AUTH_RATE_LIMIT_WINDOW_SECONDS", "300"))
+AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.environ.get("AUTH_RATE_LIMIT_MAX_ATTEMPTS", "8"))
+AUTH_RATE_LIMIT_BLOCK_SECONDS = int(os.environ.get("AUTH_RATE_LIMIT_BLOCK_SECONDS", "600"))
+
+FAILED_AUTH_ATTEMPTS = {}
+FAILED_AUTH_ATTEMPTS_LOCK = threading.Lock()
 
 
 def hash_password(password):
@@ -272,13 +283,9 @@ def _ensure_super_admin(conn):
     if admin_row is None:
         conn.execute(
             "INSERT INTO users (id, name, email, password, role, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("u-admin-1", "Admin User", SUPER_ADMIN_EMAIL, hash_password("admin123"), "admin", 1, "2026-01-01T00:00:00.000Z"),
+            ("u-admin-1", "Admin User", SUPER_ADMIN_EMAIL, hash_password(SUPER_ADMIN_BOOTSTRAP_PASSWORD), "admin", 1, "2026-01-01T00:00:00.000Z"),
         )
         return
-    conn.execute(
-        "UPDATE users SET password = ?, role = ?, active = 1 WHERE id = ?",
-        (hash_password("admin123"), "admin", admin_row[0]),
-    )
 
 
 def restore_backup_payload(payload):
@@ -439,7 +446,7 @@ class KennelHandler(BaseHTTPRequestHandler):
 
     def _issue_token(self, user_id):
         token = secrets.token_urlsafe(32)
-        expires_at = self._now(datetime.datetime.utcnow() + datetime.timedelta(days=7))
+        expires_at = self._now(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7))
         conn = self._connect()
         conn.execute("DELETE FROM auth_tokens WHERE user_id = ?", (user_id,))
         conn.execute(
@@ -500,6 +507,72 @@ class KennelHandler(BaseHTTPRequestHandler):
         if normalized not in {"staff", "reviewer", "admin"}:
             return "staff"
         return normalized
+
+    def _get_origin(self):
+        return str(self.headers.get("Origin", "")).strip()
+
+    def _is_origin_allowed(self, origin):
+        if not origin:
+            return True
+
+        if CORS_ALLOWED_ORIGINS:
+            return origin in CORS_ALLOWED_ORIGINS
+
+        parsed = urlparse(origin)
+        host = (parsed.hostname or "").lower()
+        return host in {"localhost", "127.0.0.1", "::1"}
+
+    def _resolve_cors_origin(self):
+        origin = self._get_origin()
+        if not origin:
+            return None
+        if self._is_origin_allowed(origin):
+            return origin
+        return None
+
+    def _send_cors_headers(self):
+        cors_origin = self._resolve_cors_origin()
+        if not cors_origin:
+            return
+        self.send_header("Access-Control-Allow-Origin", cors_origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    def _auth_rate_limit_key(self, prefix, identifier):
+        safe_identifier = str(identifier or "").strip().lower()[:160]
+        remote_ip = str((self.client_address or ["unknown"])[0])
+        return prefix + ":" + remote_ip + ":" + safe_identifier
+
+    def _auth_rate_limit_remaining(self, key):
+        now = time.time()
+        with FAILED_AUTH_ATTEMPTS_LOCK:
+            state = FAILED_AUTH_ATTEMPTS.get(key)
+            if not state:
+                return 0
+            blocked_until = state.get("blockedUntil", 0)
+            if blocked_until > now:
+                return int(blocked_until - now)
+            window_start = state.get("windowStart", now)
+            if (now - window_start) > AUTH_RATE_LIMIT_WINDOW_SECONDS:
+                FAILED_AUTH_ATTEMPTS.pop(key, None)
+                return 0
+        return 0
+
+    def _record_auth_failure(self, key):
+        now = time.time()
+        with FAILED_AUTH_ATTEMPTS_LOCK:
+            state = FAILED_AUTH_ATTEMPTS.get(key)
+            if not state or (now - state.get("windowStart", now)) > AUTH_RATE_LIMIT_WINDOW_SECONDS:
+                state = {"windowStart": now, "count": 0, "blockedUntil": 0}
+            state["count"] = int(state.get("count", 0)) + 1
+            if state["count"] >= AUTH_RATE_LIMIT_MAX_ATTEMPTS:
+                state["blockedUntil"] = now + AUTH_RATE_LIMIT_BLOCK_SECONDS
+            FAILED_AUTH_ATTEMPTS[key] = state
+
+    def _clear_auth_failures(self, key):
+        with FAILED_AUTH_ATTEMPTS_LOCK:
+            FAILED_AUTH_ATTEMPTS.pop(key, None)
 
     def _log_audit(self, actor, action, target=None, details=None):
         try:
@@ -1107,7 +1180,16 @@ class KennelHandler(BaseHTTPRequestHandler):
         return restore_backup_payload(payload)
 
     def do_OPTIONS(self):
-        self._send_json(204, None)
+        origin = self._get_origin()
+        if origin and not self._is_origin_allowed(origin):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(204)
+        self._send_cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -1418,6 +1500,11 @@ class KennelHandler(BaseHTTPRequestHandler):
             payload = self._parse_json(body)
             identifier = str(payload.get("identifier", "")).strip().lower()
             password = str(payload.get("password", ""))
+            login_rate_key = self._auth_rate_limit_key("login", identifier)
+            remaining = self._auth_rate_limit_remaining(login_rate_key)
+            if remaining > 0:
+                self._send_json(429, {"ok": False, "error": "Too many failed login attempts. Please try again later."})
+                return
             conn = self._connect()
             user = conn.execute(
                 "SELECT * FROM users WHERE LOWER(email)=? OR LOWER(name)=?",
@@ -1425,8 +1512,10 @@ class KennelHandler(BaseHTTPRequestHandler):
             ).fetchone()
             conn.close()
             if not user or not self._verify_password(user[3], password):
+                self._record_auth_failure(login_rate_key)
                 self._send_json(401, {"ok": False, "error": "Invalid email or password."})
                 return
+            self._clear_auth_failures(login_rate_key)
             if not bool(user[5]) and user[5] is not None:
                 self._send_json(403, {"ok": False, "error": "This account has been disabled."})
                 return
@@ -1444,8 +1533,18 @@ class KennelHandler(BaseHTTPRequestHandler):
             name = str(payload.get("name", "")).strip()
             email = str(payload.get("email", "")).strip().lower()
             password = str(payload.get("password", ""))
+            signup_rate_key = self._auth_rate_limit_key("signup", email)
+            remaining = self._auth_rate_limit_remaining(signup_rate_key)
+            if remaining > 0:
+                self._send_json(429, {"ok": False, "error": "Too many signup attempts. Please try again later."})
+                return
             if not name or not email or not password:
+                self._record_auth_failure(signup_rate_key)
                 self._send_json(400, {"ok": False, "error": "Please complete all fields."})
+                return
+            if len(password) < 8:
+                self._record_auth_failure(signup_rate_key)
+                self._send_json(400, {"ok": False, "error": "Password must be at least 8 characters long."})
                 return
             conn = self._connect()
             try:
@@ -1457,10 +1556,12 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.commit()
                 row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
                 conn.close()
+                self._clear_auth_failures(signup_rate_key)
                 token = self._issue_token(user_id)
                 self._send_json(200, {"ok": True, "token": token, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[4]}})
             except DatabaseIntegrityError:
                 conn.close()
+                self._record_auth_failure(signup_rate_key)
                 self._send_json(400, {"ok": False, "error": "An account with this email already exists."})
             return
 
@@ -2049,9 +2150,7 @@ class KennelHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self._send_cors_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -2080,14 +2179,15 @@ class KennelHandler(BaseHTTPRequestHandler):
 
     def _now(self, dt=None):
         if dt is None:
-            dt = datetime.datetime.utcnow()
+            dt = datetime.datetime.now(datetime.UTC)
         if isinstance(dt, datetime.datetime):
-            return dt.isoformat() + "Z"
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.UTC)
+            return dt.astimezone(datetime.UTC).isoformat().replace("+00:00", "Z")
         return str(dt)
 
     def _date(self):
-        import datetime
-        return datetime.datetime.utcnow().date().isoformat()
+        return datetime.datetime.now(datetime.UTC).date().isoformat()
 
     def _mime_type(self, path):
         ext = path.suffix.lower()

@@ -99,7 +99,7 @@ class AuthFlowTests(unittest.TestCase):
         self.assertTrue(disable_result.get("ok"), disable_result)
         self.assertFalse(disable_result.get("user", {}).get("active", True))
 
-    def test_staff_cannot_access_finance_and_admin_can_view_audit_logs(self):
+    def test_staff_finance_submission_is_queued_and_admin_can_view_audit_logs(self):
         admin_login = self._request_json(
             "/api/auth/login",
             {"identifier": "admin@bigpaw.com", "password": "admin123"},
@@ -123,8 +123,9 @@ class AuthFlowTests(unittest.TestCase):
 
         finance_result = self._request_json("/api/finance", token=staff_token)
         self.assertIsInstance(finance_result, dict)
-        self.assertFalse(finance_result.get("ok", True), finance_result)
-        self.assertIn("access", str(finance_result.get("error", "")).lower())
+        self.assertTrue(finance_result.get("ok"), finance_result)
+        self.assertTrue(finance_result.get("pending"), finance_result)
+        self.assertTrue(finance_result.get("approvalId"), finance_result)
 
         audit_result = self._request_json("/api/audit-logs", token=admin_token)
         self.assertTrue(audit_result.get("ok"), audit_result)

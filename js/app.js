@@ -217,7 +217,11 @@ const App = {
                 dogStatuses.forEach((entry, index) => {
                     const item = document.createElement('div');
                     item.className = 'detail-info-item';
-                    item.innerHTML = '<label>' + (entry.dogName || 'Dog') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' • Grooming: ' + (entry.groomingStatus || 'N/A') + (entry.medication ? ' • Medication: ' + entry.medication : '') + ' <button type="button" class="btn-text-danger" data-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    const dogName = Components.escapeHtml(entry.dogName || 'Dog');
+                    const healthStatus = Components.escapeHtml(entry.healthStatus || 'N/A');
+                    const groomingStatus = Components.escapeHtml(entry.groomingStatus || 'N/A');
+                    const medication = entry.medication ? (' • Medication: ' + Components.escapeHtml(entry.medication)) : '';
+                    item.innerHTML = '<label>' + dogName + '</label><p>Health: ' + healthStatus + ' • Grooming: ' + groomingStatus + medication + ' <button type="button" class="btn-text-danger" data-index="' + index + '"><i class="fas fa-times"></i></button></p>';
                     statusList.appendChild(item);
                 });
                 statusList.querySelectorAll('button[data-index]').forEach((button) => {
@@ -238,7 +242,9 @@ const App = {
                 puppyStatuses.forEach((entry, index) => {
                     const item = document.createElement('div');
                     item.className = 'detail-info-item';
-                    item.innerHTML = '<label>' + (entry.puppyName || 'Puppy') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' <button type="button" class="btn-text-danger" data-puppy-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    const puppyName = Components.escapeHtml(entry.puppyName || 'Puppy');
+                    const puppyHealth = Components.escapeHtml(entry.healthStatus || 'N/A');
+                    item.innerHTML = '<label>' + puppyName + '</label><p>Health: ' + puppyHealth + ' <button type="button" class="btn-text-danger" data-puppy-index="' + index + '"><i class="fas fa-times"></i></button></p>';
                     puppyStatusList.appendChild(item);
                 });
                 puppyStatusList.querySelectorAll('button[data-puppy-index]').forEach((button) => {
@@ -681,7 +687,6 @@ const App = {
     setupAuthForm() {
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
-        const resetForm = document.getElementById('resetForm');
         const authMessage = document.getElementById('authMessage');
 
         if (loginForm) {
@@ -729,50 +734,20 @@ const App = {
             });
         }
 
-        if (resetForm) {
-            resetForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                KennelData.resetPassword(document.getElementById('resetEmail').value, document.getElementById('resetPassword').value, document.getElementById('resetConfirm').value).then((result) => {
-                    if (result.ok) {
-                        authMessage.textContent = result.message;
-                        authMessage.className = 'auth-message success';
-                        this.showLoginView();
-                    } else {
-                        authMessage.textContent = result.error;
-                        authMessage.className = 'auth-message error';
-                    }
-                });
-            });
-        }
-
         const showLogin = document.getElementById('showLogin');
         const showSignup = document.getElementById('showSignup');
-        const showResetLink = document.getElementById('showResetLink');
         const loginPanel = document.getElementById('loginForm');
         const signupPanel = document.getElementById('signupForm');
-        const resetPanel = document.getElementById('resetForm');
-        if (showLogin && showSignup && loginPanel && signupPanel && resetPanel) {
+        if (showLogin && showSignup && loginPanel && signupPanel) {
             showLogin.addEventListener('click', () => this.showLoginView());
             showSignup.addEventListener('click', () => {
                 showSignup.classList.add('active');
                 showLogin.classList.remove('active');
                 signupPanel.classList.add('active');
                 loginPanel.classList.remove('active');
-                resetPanel.classList.remove('active');
                 authMessage.textContent = '';
                 authMessage.className = 'auth-message';
             });
-            if (showResetLink) {
-                showResetLink.addEventListener('click', () => {
-                    showLogin.classList.remove('active');
-                    showSignup.classList.remove('active');
-                    resetPanel.classList.add('active');
-                    loginPanel.classList.remove('active');
-                    signupPanel.classList.remove('active');
-                    authMessage.textContent = '';
-                    authMessage.className = 'auth-message';
-                });
-            }
         }
     },
 
@@ -781,14 +756,12 @@ const App = {
         const showSignup = document.getElementById('showSignup');
         const loginPanel = document.getElementById('loginForm');
         const signupPanel = document.getElementById('signupForm');
-        const resetPanel = document.getElementById('resetForm');
         const authMessage = document.getElementById('authMessage');
-        if (showLogin && showSignup && loginPanel && signupPanel && resetPanel) {
+        if (showLogin && showSignup && loginPanel && signupPanel) {
             showLogin.classList.add('active');
             showSignup.classList.remove('active');
             loginPanel.classList.add('active');
             signupPanel.classList.remove('active');
-            resetPanel.classList.remove('active');
             authMessage.textContent = '';
             authMessage.className = 'auth-message';
         }

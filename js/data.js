@@ -384,28 +384,29 @@ const KennelData = {
 
     _storeAuthToken(token, rememberMe) {
         try {
-            if (token) {
-                localStorage.setItem('kennelpro_auth_token', token);
-                sessionStorage.setItem('kennelpro_auth_token', token);
-                if (rememberMe) {
-                    localStorage.setItem('kennelpro_auth_token', token);
-                } else {
-                    sessionStorage.setItem('kennelpro_auth_token', token);
-                }
+            sessionStorage.removeItem('kennelpro_auth_token');
+            localStorage.removeItem('kennelpro_auth_token');
+            if (!token) {
+                return;
             }
+            if (rememberMe) {
+                localStorage.setItem('kennelpro_auth_token', token);
+                return;
+            }
+            sessionStorage.setItem('kennelpro_auth_token', token);
         } catch (e) {}
     },
 
     _persistAuthState(rememberMe) {
         const payload = JSON.stringify(this._currentUser);
         try {
+            sessionStorage.removeItem('kennelpro_auth');
+            localStorage.removeItem('kennelpro_auth');
             if (rememberMe) {
                 localStorage.setItem('kennelpro_auth', payload);
-                sessionStorage.setItem('kennelpro_auth', payload);
-            } else {
-                sessionStorage.setItem('kennelpro_auth', payload);
-                localStorage.setItem('kennelpro_auth', payload);
+                return;
             }
+            sessionStorage.setItem('kennelpro_auth', payload);
         } catch (e) {}
     },
 
