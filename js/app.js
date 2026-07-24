@@ -1237,17 +1237,29 @@ const App = {
     // ===== Records Management =====
     addRecord(dogId, recordType) {
         this.editingRecord = null;
-        document.getElementById('recordDogId').value = dogId;
-        document.getElementById('recordType').value = recordType;
-        document.getElementById('recordId').value = '';
+        const recordDogId = document.getElementById('recordDogId');
+        const recordTypeInput = document.getElementById('recordType');
+        const recordId = document.getElementById('recordId');
+        const recordModalTitle = document.getElementById('recordModalTitle');
+        const recordFormFields = document.getElementById('recordFormFields');
+        const recordModal = document.getElementById('recordModal');
+
+        if (!recordDogId || !recordTypeInput || !recordId || !recordModalTitle || !recordFormFields || !recordModal) {
+            Components.toast('Record form is unavailable. Please refresh the page.', 'error');
+            return;
+        }
+
+        recordDogId.value = dogId;
+        recordTypeInput.value = recordType;
+        recordId.value = '';
         
         const labels = {
             health: 'Health Record', vaccination: 'Vaccination', deworming: 'Deworming',
             breeding: 'Breeding Record', heatCycle: 'Heat Cycle', training: 'Training Record'
         };
-        document.getElementById('recordModalTitle').textContent = `Add ${labels[recordType] || 'Record'}`;
-        document.getElementById('recordFormFields').innerHTML = Components.getRecordFormFields(recordType);
-        document.getElementById('recordModal').classList.add('open');
+        recordModalTitle.textContent = `Add ${labels[recordType] || 'Record'}`;
+        recordFormFields.innerHTML = Components.getRecordFormFields(recordType);
+        recordModal.classList.add('open');
     },
 
     editRecord(dogId, recordType, recordId) {
@@ -1255,18 +1267,30 @@ const App = {
         const record = records.find(r => r.id === recordId);
         if (!record) return;
 
+        const recordDogId = document.getElementById('recordDogId');
+        const recordTypeInput = document.getElementById('recordType');
+        const recordIdInput = document.getElementById('recordId');
+        const recordModalTitle = document.getElementById('recordModalTitle');
+        const recordFormFields = document.getElementById('recordFormFields');
+        const recordModal = document.getElementById('recordModal');
+
+        if (!recordDogId || !recordTypeInput || !recordIdInput || !recordModalTitle || !recordFormFields || !recordModal) {
+            Components.toast('Record form is unavailable. Please refresh the page.', 'error');
+            return;
+        }
+
         this.editingRecord = { dogId, recordType, recordId };
-        document.getElementById('recordDogId').value = dogId;
-        document.getElementById('recordType').value = recordType;
-        document.getElementById('recordId').value = recordId;
+        recordDogId.value = dogId;
+        recordTypeInput.value = recordType;
+        recordIdInput.value = recordId;
 
         const labels = {
             health: 'Health Record', vaccination: 'Vaccination', deworming: 'Deworming',
             breeding: 'Breeding Record', heatCycle: 'Heat Cycle', training: 'Training Record'
         };
-        document.getElementById('recordModalTitle').textContent = `Edit ${labels[recordType] || 'Record'}`;
-        document.getElementById('recordFormFields').innerHTML = Components.getRecordFormFields(recordType, record);
-        document.getElementById('recordModal').classList.add('open');
+        recordModalTitle.textContent = `Edit ${labels[recordType] || 'Record'}`;
+        recordFormFields.innerHTML = Components.getRecordFormFields(recordType, record);
+        recordModal.classList.add('open');
     },
 
     setupRecordForm() {
