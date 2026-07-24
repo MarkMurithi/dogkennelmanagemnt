@@ -644,9 +644,6 @@ img { max-width: 100%; height: auto; display: block; }
 
 body.modal-open {
     overflow: hidden;
-    height: 100%;
-    position: fixed;
-    width: 100%;
 }
 
 .dog-detail-panel {
@@ -678,6 +675,8 @@ body.modal-open {
     color: var(--white);
     padding: 18px 20px;
     flex-shrink: 0;
+    z-index: 4;
+    box-shadow: 0 10px 24px rgba(23, 19, 13, 0.08);
 }
 
 .dog-profile-hero {
@@ -799,6 +798,8 @@ body.modal-open {
 
 .dog-profile-body {
     padding: 18px 20px 22px;
+    display: flex;
+    flex-direction: column;
 }
 
 .dog-profile-layout {
@@ -806,6 +807,7 @@ body.modal-open {
     grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
     gap: 16px;
     align-items: start;
+    min-height: 0;
 }
 
 .dog-profile-column {
@@ -2188,13 +2190,14 @@ body.modal-open {
     .card-header { padding: 14px 16px; }
     .card-body { padding: 16px; }
     .dog-detail-panel { width: 100%; max-width: 100%; margin: 0; border-radius: 0; max-height: 100vh; min-height: 0; height: 100vh; }
-    .dog-profile-header { padding: 16px; }
+    .dog-profile-header { padding: 16px; position: sticky; top: 0; z-index: 5; }
     .dog-profile-hero { flex-direction: column; text-align: left; padding-right: 0; }
     .dog-profile-title-row { flex-direction: column; align-items: flex-start; }
     .dog-profile-badges { justify-content: flex-start; }
     .dog-profile-actions { justify-content: flex-start; }
     .dog-profile-body { padding: 14px 14px 22px; }
     .dog-profile-layout { grid-template-columns: 1fr; }
+    .dog-profile-layout { min-height: 0; }
     .profile-metrics-grid,
     .profile-spotlight-grid,
     .profile-definition-grid { grid-template-columns: 1fr 1fr; }
