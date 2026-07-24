@@ -129,11 +129,16 @@ const App = {
             const form = document.getElementById('dailyReportForm');
             const saveBtn = document.getElementById('dailyReportSave');
             const addDogStatusBtn = document.getElementById('dailyReportAddDogStatus');
+            const addPuppyStatusBtn = document.getElementById('dailyReportAddPuppyStatus');
             const statusList = document.getElementById('dailyReportStatusList');
+            const puppyStatusList = document.getElementById('dailyReportPuppyStatusList');
             const dogSelect = document.getElementById('dailyReportDogSelect');
             const dogHealth = document.getElementById('dailyReportDogHealth');
             const dogGrooming = document.getElementById('dailyReportDogGrooming');
+            const puppySelect = document.getElementById('dailyReportPuppySelect');
+            const puppyHealth = document.getElementById('dailyReportPuppyHealth');
             let dogStatuses = [];
+            let puppyStatuses = [];
 
             const renderStatusList = () => {
                 if (!statusList) return;
@@ -156,6 +161,27 @@ const App = {
                 });
             };
 
+            const renderPuppyStatusList = () => {
+                if (!puppyStatusList) return;
+                puppyStatusList.innerHTML = '';
+                if (puppyStatuses.length === 0) {
+                    puppyStatusList.innerHTML = '<p style="color:var(--gray-500)">No puppy statuses added yet.</p>';
+                    return;
+                }
+                puppyStatuses.forEach((entry, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'detail-info-item';
+                    item.innerHTML = '<label>' + (entry.puppyName || 'Puppy') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' <button type="button" class="btn-text-danger" data-puppy-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    puppyStatusList.appendChild(item);
+                });
+                puppyStatusList.querySelectorAll('button[data-puppy-index]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        puppyStatuses.splice(Number(button.dataset.puppyIndex), 1);
+                        renderPuppyStatusList();
+                    });
+                });
+            };
+
             if (addDogStatusBtn) {
                 addDogStatusBtn.addEventListener('click', () => {
                     if (!dogSelect || !dogSelect.value) {
@@ -173,6 +199,24 @@ const App = {
                     dogHealth.value = '';
                     dogGrooming.value = '';
                     renderStatusList();
+                });
+            }
+
+            if (addPuppyStatusBtn) {
+                addPuppyStatusBtn.addEventListener('click', () => {
+                    if (!puppySelect || !puppySelect.value) {
+                        Components.toast('Please select a puppy first.', 'error');
+                        return;
+                    }
+                    const label = puppySelect.options[puppySelect.selectedIndex]?.text || 'Puppy';
+                    const healthValue = puppyHealth ? puppyHealth.value.trim() : '';
+                    if (!healthValue) {
+                        Components.toast('Please enter puppy health status.', 'error');
+                        return;
+                    }
+                    puppyStatuses.push({ puppyId: puppySelect.value, puppyName: label, healthStatus: healthValue });
+                    puppyHealth.value = '';
+                    renderPuppyStatusList();
                 });
             }
 
@@ -199,6 +243,7 @@ const App = {
                         foodToday: foodTodayValue,
                         kennelsWashed: kennelsWashedValue,
                         dogStatuses: dogStatuses,
+                        puppyStatuses: puppyStatuses,
                         visitors: visitorsValue,
                         personInCharge: personInChargeValue,
                         medicationNotes: medicationNotesValue,
@@ -214,13 +259,16 @@ const App = {
                         Components.toast('Daily report saved');
                         form.reset();
                         dogStatuses = [];
+                        puppyStatuses = [];
                         renderStatusList();
+                        renderPuppyStatusList();
                         this.render();
                     });
                 });
             }
 
             renderStatusList();
+            renderPuppyStatusList();
         }
 
         if (this.currentPage === 'puppies') {
@@ -1041,10 +1089,13 @@ const App = {
 
     exportDailyReports() {
         const reports = KennelData.getDailyReports();
-        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,medicationNotes,cleaningChecklist,staffComments,notes,dogStatuses'];
+        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,medicationNotes,cleaningChecklist,staffComments,notes,dogStatuses,puppyStatuses'];
         reports.forEach((report) => {
             const dogStatuses = (report.dogStatuses || []).map(function(item) {
                 return (item.dogName || 'Dog') + ': Health=' + (item.healthStatus || 'N/A') + '; Grooming=' + (item.groomingStatus || 'N/A');
+            }).join(' | ');
+            const puppyStatuses = (report.puppyStatuses || []).map(function(item) {
+                return (item.puppyName || 'Puppy') + ': Health=' + (item.healthStatus || 'N/A');
             }).join(' | ');
             const row = [
                 (report.date || ''),
@@ -1057,7 +1108,8 @@ const App = {
                 (report.cleaningChecklist || ''),
                 (report.staffComments || ''),
                 (report.notes || ''),
-                dogStatuses
+                dogStatuses,
+                puppyStatuses
             ].map(function(value) {
                 return '"' + String(value).replace(/"/g, '""') + '"';
             }).join(',');

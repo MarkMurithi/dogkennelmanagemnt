@@ -156,6 +156,7 @@ def init_db():
             foodToday TEXT,
             kennelsWashed INTEGER DEFAULT 0,
             dogStatuses TEXT,
+            puppyStatuses TEXT,
             visitors TEXT,
             personInCharge TEXT,
             medicationNotes TEXT,
@@ -166,6 +167,14 @@ def init_db():
         )
         """
     )
+    conn.commit()
+    try:
+        conn.execute("ALTER TABLE daily_reports ADD COLUMN puppyStatuses TEXT")
+    except Exception as exc:
+        # SQLite/Postgres differ in duplicate-column error classes; ignore when the column already exists.
+        conn.rollback()
+        if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
+            raise
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS activities (
@@ -327,7 +336,7 @@ def restore_backup_payload(payload):
         )
     for report in payload.get("dailyReports", []) or payload.get("daily_reports", []):
         conn.execute(
-            "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 report.get("id") or "dr" + str(int(__import__("time").time() * 1000)),
                 report.get("date", datetime.datetime.now(datetime.UTC).date().isoformat()),
@@ -335,6 +344,7 @@ def restore_backup_payload(payload):
                 report.get("foodToday", ""),
                 int(bool(report.get("kennelsWashed", False))),
                 json.dumps(report.get("dogStatuses") or []),
+                json.dumps(report.get("puppyStatuses") or []),
                 report.get("visitors", ""),
                 report.get("personInCharge", ""),
                 report.get("medicationNotes", ""),
@@ -715,15 +725,16 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "foodToday": row[3],
                     "kennelsWashed": bool(row[4]),
                     "dogStatuses": json.loads(row[5]) if row[5] else [],
-                    "visitors": row[6],
-                    "personInCharge": row[7],
-                    "medicationNotes": row[8],
-                    "cleaningChecklist": row[9],
-                    "staffComments": row[10],
-                    "notes": row[11],
-                    "createdAt": row[12],
+                    "puppyStatuses": json.loads(row[6]) if row[6] else [],
+                    "visitors": row[7],
+                    "personInCharge": row[8],
+                    "medicationNotes": row[9],
+                    "cleaningChecklist": row[10],
+                    "staffComments": row[11],
+                    "notes": row[12],
+                    "createdAt": row[13],
                 }
-                for row in self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
+                for row in self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
             ],
             "users": [
                 {"id": row[0], "name": row[1], "email": row[2], "password": row[3], "role": row[4], "active": bool(row[5]), "createdAt": row[6]}
@@ -1383,7 +1394,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            rows = self._fetch_all("SELECT * FROM daily_reports ORDER BY date DESC, createdAt DESC")
+            rows = self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
             payload = []
             for row in rows:
                 payload.append({
@@ -1393,13 +1404,14 @@ class KennelHandler(BaseHTTPRequestHandler):
                     "foodToday": row[3],
                     "kennelsWashed": bool(row[4]),
                     "dogStatuses": json.loads(row[5]) if row[5] else [],
-                    "visitors": row[6],
-                    "personInCharge": row[7],
-                    "medicationNotes": row[8],
-                    "cleaningChecklist": row[9],
-                    "staffComments": row[10],
-                    "notes": row[11],
-                    "createdAt": row[12],
+                    "puppyStatuses": json.loads(row[6]) if row[6] else [],
+                    "visitors": row[7],
+                    "personInCharge": row[8],
+                    "medicationNotes": row[9],
+                    "cleaningChecklist": row[10],
+                    "staffComments": row[11],
+                    "notes": row[12],
+                    "createdAt": row[13],
                 })
             self._send_json(200, payload)
             return
@@ -1417,9 +1429,12 @@ class KennelHandler(BaseHTTPRequestHandler):
             dog_statuses = payload.get("dogStatuses") or []
             if not isinstance(dog_statuses, list):
                 dog_statuses = []
+            puppy_statuses = payload.get("puppyStatuses") or []
+            if not isinstance(puppy_statuses, list):
+                puppy_statuses = []
             conn = self._connect()
             conn.execute(
-                "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO daily_reports (id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     report_id,
                     date_value,
@@ -1427,6 +1442,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                     payload.get("foodToday", ""),
                     int(bool(payload.get("kennelsWashed", False))),
                     json.dumps(dog_statuses),
+                    json.dumps(puppy_statuses),
                     payload.get("visitors", ""),
                     payload.get("personInCharge", ""),
                     payload.get("medicationNotes", ""),
@@ -1446,6 +1462,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 "foodToday": payload.get("foodToday", ""),
                 "kennelsWashed": bool(payload.get("kennelsWashed", False)),
                 "dogStatuses": dog_statuses,
+                "puppyStatuses": puppy_statuses,
                 "visitors": payload.get("visitors", ""),
                 "personInCharge": payload.get("personInCharge", ""),
                 "medicationNotes": payload.get("medicationNotes", ""),

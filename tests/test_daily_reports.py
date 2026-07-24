@@ -72,6 +72,7 @@ class DailyReportTests(unittest.TestCase):
                 "foodToday": "Chicken and rice",
                 "kennelsWashed": True,
                 "dogStatuses": [{"dogId": "d1", "dogName": "Max", "healthStatus": "Good", "groomingStatus": "Clean"}],
+                "puppyStatuses": [{"puppyId": "p1", "puppyName": "Tiny", "healthStatus": "Healthy"}],
                 "visitors": "Two visitors",
                 "personInCharge": "Mina",
                 "medicationNotes": "Give meds at noon",
@@ -92,6 +93,8 @@ class DailyReportTests(unittest.TestCase):
         self.assertEqual(list_result[0]["medicationNotes"], "Give meds at noon")
         self.assertEqual(list_result[0]["cleaningChecklist"], "Water bowls, play area")
         self.assertEqual(list_result[0]["staffComments"], "Busy morning but everything stayed calm")
+        self.assertEqual(list_result[0]["puppyStatuses"][0]["puppyName"], "Tiny")
+        self.assertEqual(list_result[0]["puppyStatuses"][0]["healthStatus"], "Healthy")
 
 
 if __name__ == "__main__":

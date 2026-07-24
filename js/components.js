@@ -660,12 +660,20 @@ const Components = {
     dailyReportPage: function() {
         var reports = KennelData.getDailyReports();
         var dogs = KennelData.getDogs();
+        var puppies = KennelData.getPuppies();
         var dogOptionsHtml = '';
+        var puppyOptionsHtml = '';
         dogs.forEach(function(dog) {
             dogOptionsHtml += '<option value="' + dog.id + '">' + dog.name + '</option>';
         });
+        puppies.forEach(function(puppy) {
+            puppyOptionsHtml += '<option value="' + puppy.id + '">' + puppy.name + '</option>';
+        });
         if (!dogOptionsHtml) {
             dogOptionsHtml = '<option value="">No dogs available</option>';
+        }
+        if (!puppyOptionsHtml) {
+            puppyOptionsHtml = '<option value="">No puppies available</option>';
         }
 
         var reportCardsHtml = '';
@@ -679,17 +687,23 @@ const Components = {
                 var report = reports[i];
                 var statusesHtml = '';
                 var statuses = report.dogStatuses || [];
+                var puppyStatusesHtml = '';
+                var puppyStatuses = report.puppyStatuses || [];
                 for (var j = 0; j < statuses.length; j++) {
                     var status = statuses[j];
                     statusesHtml += '<li><strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
                 }
-                reportCardsHtml += '<div class="card section-card" style="margin-bottom:12px"><div class="card-header"><h3><i class="fas fa-calendar-day"></i> ' + new Date(report.date).toLocaleDateString() + '</h3></div><div class="card-body"><div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div><div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Medication notes</label><p>' + (report.medicationNotes || 'N/A') + '</p></div><div class="detail-info-item"><label>Cleaning checklist</label><p>' + (report.cleaningChecklist || 'N/A') + '</p></div><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div><div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + statusesHtml + '</ul></div>' + (report.notes ? '<div style="margin-top:12px;padding:12px;border-radius:12px;background:var(--gray-50)"><strong>Notes</strong><p style="margin-top:6px;color:var(--gray-600)">' + report.notes + '</p></div>' : '') + '</div></div>';
+                for (var k = 0; k < puppyStatuses.length; k++) {
+                    var puppyStatus = puppyStatuses[k];
+                    puppyStatusesHtml += '<li><strong>' + (puppyStatus.puppyName || 'Puppy') + '</strong> — Health: ' + (puppyStatus.healthStatus || 'N/A') + '</li>';
+                }
+                reportCardsHtml += '<div class="card section-card" style="margin-bottom:12px"><div class="card-header"><h3><i class="fas fa-calendar-day"></i> ' + new Date(report.date).toLocaleDateString() + '</h3></div><div class="card-body"><div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div><div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Medication notes</label><p>' + (report.medicationNotes || 'N/A') + '</p></div><div class="detail-info-item"><label>Cleaning checklist</label><p>' + (report.cleaningChecklist || 'N/A') + '</p></div><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div><div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (statusesHtml || '<li>No dog status logged.</li>') + '</ul></div><div style="margin-top:12px"><strong>Puppy health status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (puppyStatusesHtml || '<li>No puppy health status logged.</li>') + '</ul></div>' + (report.notes ? '<div style="margin-top:12px;padding:12px;border-radius:12px;background:var(--gray-50)"><strong>Notes</strong><p style="margin-top:6px;color:var(--gray-600)">' + report.notes + '</p></div>' : '') + '</div></div>';
             }
         }
 
         return '<div class="page-shell" id="pageDailyReport">' +
             '<section class="page-hero"><div><div class="hero-badge"><i class="fas fa-file-alt"></i> Daily Operations</div><h2>Daily report</h2><p>Capture the kennel’s day-to-day care, staffing, and visitor notes in one place.</p></div></section>' +
-            '<div class="content-grid"><div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-line"></i> Daily snapshot</h3></div><div class="card-body">' + summary + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.exportDailyReports()"><i class="fas fa-download"></i> Export reports</button></div></div></div><div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportCleaningChecklist">Cleaning checklist</label><textarea id="dailyReportCleaningChecklist" rows="2" placeholder="What was cleaned or restocked?"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-group"><label for="dailyReportNotes">Notes</label><textarea id="dailyReportNotes" rows="3" placeholder="Add any extra observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><input type="text" id="dailyReportDogHealth" placeholder="Good / Needs watch"></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><input type="text" id="dailyReportDogGrooming" placeholder="Clean / Needs grooming"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>' +
+            '<div class="content-grid"><div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-line"></i> Daily snapshot</h3></div><div class="card-body">' + summary + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.exportDailyReports()"><i class="fas fa-download"></i> Export reports</button></div></div></div><div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportCleaningChecklist">Cleaning checklist</label><textarea id="dailyReportCleaningChecklist" rows="2" placeholder="What was cleaned or restocked?"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-group"><label for="dailyReportNotes">Notes</label><textarea id="dailyReportNotes" rows="3" placeholder="Add any extra observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><input type="text" id="dailyReportDogHealth" placeholder="Good / Needs watch"></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><input type="text" id="dailyReportDogGrooming" placeholder="Clean / Needs grooming"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div><div class="form-card"><div class="form-card-title"><i class="fas fa-paw"></i> Puppy health checklist</div><div class="form-group"><label for="dailyReportPuppySelect">Select puppy</label><select id="dailyReportPuppySelect">' + puppyOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportPuppyHealth">Health status</label><input type="text" id="dailyReportPuppyHealth" placeholder="Healthy / Needs observation"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddPuppyStatus"><i class="fas fa-plus"></i> Add puppy status</button><div id="dailyReportPuppyStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>' +
             '<div class="card section-card full-width"><div class="card-header"><h3><i class="fas fa-history"></i> Previous reports</h3></div><div class="card-body">' + reportCardsHtml + '</div></div></div></div>';
     },
 
@@ -814,6 +828,20 @@ const Components = {
 
     puppiesPage: function() {
         var puppies = KennelData.getPuppies();
+        var reports = KennelData.getDailyReports();
+        var latestPuppyHealthById = {};
+        for (var reportIndex = 0; reportIndex < reports.length; reportIndex++) {
+            var puppyStatuses = reports[reportIndex].puppyStatuses || [];
+            for (var statusIndex = 0; statusIndex < puppyStatuses.length; statusIndex++) {
+                var puppyStatus = puppyStatuses[statusIndex];
+                if (puppyStatus && puppyStatus.puppyId && puppyStatus.healthStatus && !latestPuppyHealthById[puppyStatus.puppyId]) {
+                    latestPuppyHealthById[puppyStatus.puppyId] = {
+                        healthStatus: puppyStatus.healthStatus,
+                        reportDate: reports[reportIndex].date || ''
+                    };
+                }
+            }
+        }
         var puppyCardsHtml = '';
 
         if (puppies.length === 0) {
@@ -825,8 +853,12 @@ const Components = {
                 var nextVaccinationText = (puppy.vaccinations && puppy.vaccinations.length > 0 && puppy.vaccinations[0].nextDue) ? puppy.vaccinations[0].nextDue : 'Not scheduled';
                 var dewormingText = (puppy.deworming && puppy.deworming.length > 0 && puppy.deworming[0].date) ? puppy.deworming[0].date : 'Not recorded';
                 var nextDewormingText = (puppy.deworming && puppy.deworming.length > 0 && puppy.deworming[0].nextDue) ? puppy.deworming[0].nextDue : 'Not scheduled';
+                var latestDailyHealth = latestPuppyHealthById[puppy.id] || null;
                 var hasHealthTracking = vaccinationText !== 'Not recorded' || dewormingText !== 'Not recorded';
-                var healthStatusText = puppy.healthStatus || (hasHealthTracking ? 'Under tracking' : 'Not recorded');
+                var healthStatusText = (latestDailyHealth && latestDailyHealth.healthStatus) || puppy.healthStatus || (hasHealthTracking ? 'Under tracking' : 'Not recorded');
+                var healthStatusSource = (latestDailyHealth && latestDailyHealth.reportDate)
+                    ? 'Daily report on ' + new Date(latestDailyHealth.reportDate).toLocaleDateString()
+                    : 'Profile record';
                 var ownerProfileText = (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold')
                     ? '<div class="detail-info-item"><label>Owner Name</label><p>' + (puppy.ownerName || 'N/A') + '</p></div>' +
                       '<div class="detail-info-item"><label>Phone Number</label><p>' + (puppy.ownerPhone || 'N/A') + '</p></div>' +
@@ -864,7 +896,7 @@ const Components = {
                     '<div class="detail-info-item"><label>Next Vaccination</label><p>' + nextVaccinationText + '</p></div>' +
                     '<div class="detail-info-item"><label>Deworming</label><p>' + dewormingText + '</p></div>' +
                     '<div class="detail-info-item"><label>Next Deworming</label><p>' + nextDewormingText + '</p></div>' +
-                    '<div class="detail-info-item"><label>Health Status</label><p>' + healthStatusText + '</p></div>' +
+                    '<div class="detail-info-item"><label>Health Status</label><p>' + healthStatusText + '</p><small style="color:var(--gray-500)">' + healthStatusSource + '</small></div>' +
                     '</div></section>' +
                     '<section class="puppy-profile-section">' +
                     '<h4><i class="fas fa-handshake"></i> Sale & Owner</h4>' +
