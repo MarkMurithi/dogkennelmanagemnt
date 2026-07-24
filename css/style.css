@@ -805,6 +805,13 @@ body.modal-open {
 .records-tab-content { display: none; }
 .records-tab-content.active { display: block; }
 
+.records-tab-content.active .records-list {
+    max-height: min(42vh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+}
+
 /* ===== Records List ===== */
 .records-list { display: flex; flex-direction: column; gap: 8px; }
 
