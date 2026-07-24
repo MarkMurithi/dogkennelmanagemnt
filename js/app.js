@@ -970,12 +970,6 @@ const App = {
         main.insertAdjacentHTML('beforeend', Components.dogDetailPanel(dog));
         document.body.classList.add('modal-open');
 
-        const overlay = document.getElementById('dogDetailOverlay');
-        if (overlay) {
-            overlay.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
-            overlay.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
-        }
-
         this.setupDetailTabs();
     },
 

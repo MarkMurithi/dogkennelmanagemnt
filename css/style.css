@@ -632,7 +632,8 @@ img { max-width: 100%; height: auto; display: block; }
     inset: 0;
     background: rgba(23, 19, 13, 0.55);
     z-index: 2000;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px;
     align-items: flex-start;
     justify-content: center;
@@ -655,7 +656,8 @@ body.modal-open {
     margin: 0 auto;
     border-radius: 20px;
     box-shadow: var(--shadow-lg);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     animation: slideUp 0.3s ease;
     border: 1px solid rgba(200,169,81,0.16);
     display: flex;
@@ -787,13 +789,11 @@ body.modal-open {
 
 .detail-body {
     padding: 16px 20px 20px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: visible;
     word-break: break-word;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-height: 0;
-    max-height: 100%;
-    overscroll-behavior: contain;
+    max-height: none;
 }
 
 .dog-profile-body {
