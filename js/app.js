@@ -1502,6 +1502,27 @@ const App = {
         };
     },
 
+    markAlertDone(dogId, recordType, recordId, dueValue) {
+        if (!dogId || !recordType || !recordId) {
+            Components.toast('Unable to mark this reminder as done.', 'error');
+            return;
+        }
+        KennelData.markAlertAsDone(dogId, recordType, recordId, dueValue).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to mark reminder as done', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Done update submitted for admin approval.');
+                return;
+            }
+            Components.toast('Reminder marked as done.');
+            if (this.currentPage === 'alerts') {
+                this.render();
+            }
+        });
+    },
+
     // ===== Invoice Modal =====
     setupInvoiceModal() {
         document.getElementById('invoiceModalCancel').addEventListener('click', () => {

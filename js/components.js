@@ -1304,7 +1304,10 @@ const Components = {
                     '<p style="font-size:0.75rem;color:var(--gray-400);margin-top:4px">' +
                     (a.record.type || '') + (a.record.vet ? ' ' + a.record.vet : '') + (a.record.trainer ? ' ' + a.record.trainer : '') +
                     '</p></div>' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                    '<button class="btn btn-sm btn-secondary" onclick="App.markAlertDone(\'' + a.dogId + '\',\'' + a.recordType + '\',\'' + a.record.id + '\',\'' + (a.nextDue || '') + '\')">Done</button>' +
                     '<button class="btn btn-sm btn-primary" onclick="App.openDogDetail(\'' + a.dogId + '\')">View</button>' +
+                    '</div>' +
                     '</div>';
             }
             contentHtml = '<div class="alerts-list">' + itemsHtml + '</div>';

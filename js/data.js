@@ -1236,6 +1236,26 @@ const KennelData = {
         });
     },
 
+    markAlertAsDone(dogId, recordType, recordId, dueValue) {
+        var dog = this.getDog(dogId);
+        if (!dog || !dog.records || !dog.records[recordType]) {
+            return Promise.resolve({ ok: false, error: 'Record not found.' });
+        }
+        var records = dog.records[recordType] || [];
+        var index = records.findIndex(function(item) { return item.id === recordId; });
+        if (index === -1) {
+            return Promise.resolve({ ok: false, error: 'Record not found.' });
+        }
+        var effectiveDue = dueValue || records[index].nextDue || records[index].expectedDate || records[index].nextExpected;
+        if (!effectiveDue) {
+            return Promise.resolve({ ok: false, error: 'This item has no due date to dismiss.' });
+        }
+        return this.updateRecord(dogId, recordType, recordId, {
+            alertDismissedFor: effectiveDue,
+            alertDismissedAt: new Date().toISOString()
+        });
+    },
+
     getActivities(limit) {
         if (limit === undefined) limit = 10;
         var sorted = this._activities.slice().sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
@@ -1424,6 +1444,9 @@ const KennelData = {
                 d.records[type].forEach(function(r) {
                     var dueValue = r.nextDue || r.expectedDate || r.nextExpected;
                     if (dueValue) {
+                        if (r.alertDismissedFor && r.alertDismissedFor === dueValue) {
+                            return;
+                        }
                         var dueDate = new Date(dueValue);
                         var dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
                         var days = Math.round((dueStart - todayStart) / (1000 * 60 * 60 * 24));
