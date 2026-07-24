@@ -55,6 +55,7 @@ def init_db():
         )
         """
     )
+    conn.commit()
     try:
         conn.execute("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1")
     except Exception as exc:
