@@ -1583,7 +1583,56 @@ const App = {
                 return;
             }
             Components.toast('Reminder marked as done.');
-            if (this.currentPage === 'alerts') {
+            if (this.currentPage === 'alerts' || this.currentPage === 'calendar') {
+                this.render();
+            }
+        });
+    },
+
+    markCalendarUpcomingDone(dogId, recordType, recordId, dueValue) {
+        this.markAlertDone(dogId, recordType, recordId, dueValue);
+    },
+
+    postponeCalendarUpcoming(dogId, recordType, recordId, dueField, currentDueValue) {
+        if (!dogId || !recordType || !recordId) {
+            Components.toast('Unable to postpone this item.', 'error');
+            return;
+        }
+
+        var baseDate = currentDueValue ? new Date(currentDueValue) : new Date();
+        if (Number.isNaN(baseDate.getTime())) {
+            baseDate = new Date();
+        }
+        baseDate.setDate(baseDate.getDate() + 1);
+        var defaultDate = baseDate.toISOString().slice(0, 10);
+        var newDateValue = window.prompt('Enter new due date (YYYY-MM-DD)', defaultDate);
+        if (newDateValue === null) {
+            return;
+        }
+        newDateValue = String(newDateValue).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateValue)) {
+            Components.toast('Please enter a valid date in YYYY-MM-DD format.', 'error');
+            return;
+        }
+
+        var updates = {
+            alertDismissedFor: null,
+            alertDismissedAt: null
+        };
+        var dueKey = dueField || 'nextDue';
+        updates[dueKey] = newDateValue;
+
+        KennelData.updateRecord(dogId, recordType, recordId, updates).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to postpone reminder', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Postpone update submitted for admin approval.');
+                return;
+            }
+            Components.toast('Reminder postponed to ' + newDateValue + '.');
+            if (this.currentPage === 'calendar') {
                 this.render();
             }
         });

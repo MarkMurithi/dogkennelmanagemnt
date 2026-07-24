@@ -1294,12 +1294,13 @@ const KennelData = {
             if (!d.records) return;
             Object.keys(d.records).forEach(function(type) {
                 d.records[type].forEach(function(r) {
-                    var dueDate = r.nextDue || r.expectedDate || r.nextExpected;
+                    var dueField = r.nextDue ? 'nextDue' : (r.expectedDate ? 'expectedDate' : (r.nextExpected ? 'nextExpected' : ''));
+                    var dueDate = dueField ? r[dueField] : null;
                     if (!dueDate) return;
                     var due = new Date(dueDate);
                     var dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
                     if (dueStart >= todayStart) {
-                        upcomingEvents.push({ dogName: d.name, dogId: d.id, type: type, record: r, nextDue: dueDate });
+                        upcomingEvents.push({ dogName: d.name, dogId: d.id, type: type, record: r, nextDue: dueDate, dueField: dueField });
                     }
                 });
             });
