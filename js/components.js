@@ -126,19 +126,25 @@ const Components = {
         var priceTag = (dog.forSale && dog.price) ? '<span class="tag tag-for-sale">KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' : '';
         var weightHtml = dog.weight ? dog.weight + ' kg' : 'N/A';
         var imageFrame = '<div class="dog-card-image-frame">' + imageHtml + '</div>';
+        var statusValue = dog.status || 'Active';
+        var statusClass = 'tag-' + statusValue.toLowerCase();
 
         return '<div class="card dog-card" onclick="App.openDogDetail(\'' + dog.id + '\')">' +
             saleBadge +
             imageFrame +
             '<div class="dog-card-body">' +
             '<div class="dog-card-top">' +
-            '<div class="dog-card-name">' + dog.name + '</div>' +
-            '<span class="status-pill ' + dog.status.toLowerCase() + '">' + dog.status + '</span>' +
+            '<div class="dog-card-name-wrap"><div class="dog-card-name">' + dog.name + '</div><div class="dog-card-breed">' + dog.breed + '</div></div>' +
+            '<span class="status-pill ' + statusValue.toLowerCase() + '">' + statusValue + '</span>' +
             '</div>' +
-            '<div class="dog-card-breed">' + dog.breed + '</div>' +
+            '<div class="dog-card-meta-row">' +
+            '<span class="dog-card-meta"><i class="fas ' + genderIcon + '"></i> ' + dog.gender + '</span>' +
+            '<span class="dog-card-meta"><i class="fas fa-weight-hanging"></i> ' + weightHtml + '</span>' +
+            '<span class="dog-card-meta"><i class="fas fa-clock"></i> ' + age + '</span>' +
+            '</div>' +
             '<div class="dog-card-tags">' +
             '<span class="tag ' + genderClass + '"><i class="fas ' + genderIcon + '"></i> ' + dog.gender + '</span>' +
-            '<span class="tag tag-' + dog.status.toLowerCase() + '">' + dog.status + '</span>' +
+            '<span class="tag ' + statusClass + '">' + statusValue + '</span>' +
             priceTag +
             '</div></div>' +
             '<div class="dog-card-footer"><span>' + (dog.weight ? dog.weight + ' kg' : 'Weight N/A') + '</span><span>' + age + '</span></div>' +
@@ -259,6 +265,29 @@ const Components = {
         var hasImage = dog.image && dog.image.trim() !== '';
         var age = dog.dob ? this.calculateAge(dog.dob) : 'Unknown';
         var genderIcon = dog.gender === 'Male' ? 'fa-mars' : 'fa-venus';
+        var statusValue = dog.status || 'Active';
+        var statusClass = 'tag-' + statusValue.toLowerCase();
+        var dailyStatuses = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
+        var latestDailyStatus = dailyStatuses.length > 0 ? dailyStatuses[0] : null;
+        var healthRecords = ((dog.records && dog.records.health) || []).slice().sort(function(a, b) {
+            var aDate = a.date ? new Date(a.date) : new Date(0);
+            var bDate = b.date ? new Date(b.date) : new Date(0);
+            return bDate - aDate;
+        });
+        var latestHealthRecord = healthRecords.length > 0 ? healthRecords[0] : null;
+        function formatMoney(value) {
+            if (value === undefined || value === null || value === '') return 'N/A';
+            return 'KSh ' + Number(value).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fieldItem(label, value) {
+            return '<div class="profile-field"><label>' + label + '</label><p>' + (value || 'N/A') + '</p></div>';
+        }
+        function metricChip(icon, label, value) {
+            return '<div class="profile-metric"><div class="profile-metric-icon"><i class="fas ' + icon + '"></i></div><div><span>' + label + '</span><strong>' + value + '</strong></div></div>';
+        }
+        function sectionCard(title, icon, body, extraClass) {
+            return '<section class="profile-section-card' + (extraClass ? ' ' + extraClass : '') + '"><div class="profile-section-title"><i class="fas ' + icon + '"></i><h4>' + title + '</h4></div>' + body + '</section>';
+        }
         var avatarHtml;
         if (hasImage) {
             avatarHtml = '<img class="detail-avatar" src="' + dog.image + '" alt="' + dog.name + '">';
@@ -300,7 +329,7 @@ const Components = {
 
         var notesHtml = '';
         if (dog.notes) {
-            notesHtml = '<div style="margin-bottom:24px;padding:16px;background:var(--gray-50);border-radius:var(--radius);font-size:0.9rem;color:var(--gray-600)"><strong>Notes:</strong> ' + dog.notes + '</div>';
+            notesHtml = sectionCard('Notes', 'fa-sticky-note', '<p class="profile-copy">' + dog.notes + '</p>', 'profile-section-notes');
         }
 
         var attachmentsHtml = '';
@@ -309,21 +338,96 @@ const Components = {
             for (var a = 0; a < dog.attachments.length; a++) {
                 thumbs += '<img class="dog-attachment-thumb" src="' + dog.attachments[a] + '" alt="Dog attachment">';
             }
-            attachmentsHtml = '<div style="margin-bottom:24px"><div style="font-size:0.85rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Attachments</div><div class="dog-attachments-row">' + thumbs + '</div></div>';
+            attachmentsHtml = sectionCard('Documents & Photos', 'fa-images', '<div class="dog-attachments-row">' + thumbs + '</div>', 'profile-section-attachments');
         }
 
-        var statusClass = 'tag-' + dog.status.toLowerCase();
+        var dailyHealthHtml = latestDailyStatus ?
+            '<div class="profile-spotlight-card success">' +
+                '<div class="profile-spotlight-label">Latest daily status</div>' +
+                '<div class="profile-spotlight-title">' + (latestDailyStatus.healthStatus || 'Status not set') + '</div>' +
+                '<div class="profile-spotlight-meta">' +
+                    (latestDailyStatus.groomingStatus ? 'Grooming: ' + latestDailyStatus.groomingStatus : 'Grooming not recorded') +
+                    (latestDailyStatus.medication ? ' • Medication: ' + latestDailyStatus.medication : '') +
+                    (latestDailyStatus.personInCharge ? ' • By: ' + latestDailyStatus.personInCharge : '') +
+                '</div>' +
+                '<div class="profile-spotlight-date">' + (latestDailyStatus.reportDate ? new Date(latestDailyStatus.reportDate).toLocaleDateString() : 'Date pending') + '</div>' +
+            '</div>' :
+            '<div class="profile-empty-state">No daily health status has been recorded yet.</div>';
+
+        var vetHealthHtml = latestHealthRecord ?
+            '<div class="profile-spotlight-card neutral">' +
+                '<div class="profile-spotlight-label">Latest vet record</div>' +
+                '<div class="profile-spotlight-title">' + (latestHealthRecord.type || 'Checkup') + '</div>' +
+                '<div class="profile-spotlight-meta">' +
+                    (latestHealthRecord.vet ? 'Vet: ' + latestHealthRecord.vet + ' • ' : '') +
+                    (latestHealthRecord.notes || 'No notes') +
+                '</div>' +
+                '<div class="profile-spotlight-date">' + (latestHealthRecord.date ? new Date(latestHealthRecord.date).toLocaleDateString() : 'Date pending') + '</div>' +
+            '</div>' :
+            '<div class="profile-empty-state">No vet history has been added yet.</div>';
+
+        var identityHtml =
+            '<div class="profile-definition-grid">' +
+                fieldItem('Gender', '<i class="fas ' + genderIcon + '"></i> ' + dog.gender) +
+                fieldItem('Date of Birth', dog.dob ? new Date(dog.dob).toLocaleDateString() : 'N/A') +
+                fieldItem('Age', age) +
+                fieldItem('Weight', dog.weight ? dog.weight + ' kg' : 'N/A') +
+                fieldItem('Color', dog.color || 'N/A') +
+                fieldItem('Status', '<span class="tag ' + statusClass + '">' + statusValue + '</span>') +
+                fieldItem('Microchip', dog.microchip || 'N/A') +
+                fieldItem('Registration', dog.registration || 'N/A') +
+            '</div>';
+
+        var pedigreeHtml =
+            '<div class="profile-definition-grid">' +
+                fieldItem('Breed', dog.breed || 'N/A') +
+                fieldItem('Estimated value', formatMoney(dog.value)) +
+                fieldItem('Sale status', dog.forSale ? 'Listed for sale' : 'Kennel owned') +
+                fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'Not listed') +
+                fieldItem('Ownership', dog.ownerName || 'Not assigned') +
+                fieldItem('Owner contact', dog.ownerPhone || 'N/A') +
+                fieldItem('Owner address', dog.ownerAddress || 'N/A') +
+                fieldItem('Pedigree notes', 'Not recorded for this dog yet') +
+            '</div>';
+
+        var healthSectionHtml =
+            '<div class="profile-spotlight-grid">' + dailyHealthHtml + vetHealthHtml + '</div>' +
+            '<div class="profile-callout">Use the Health tab below for the full medical timeline.</div>';
+
+        var saleSectionHtml =
+            '<div class="profile-definition-grid">' +
+                fieldItem('For sale', dog.forSale ? 'Yes' : 'No') +
+                fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'N/A') +
+                fieldItem('Kennel value', formatMoney(dog.value)) +
+                fieldItem('Owner / keeper', dog.ownerName || 'Kennel managed') +
+            '</div>';
+
+        var overviewMetricsHtml =
+            '<div class="profile-metrics-grid">' +
+                metricChip('fa-weight-hanging', 'Weight', dog.weight ? dog.weight + ' kg' : 'N/A') +
+                metricChip('fa-palette', 'Color', dog.color || 'N/A') +
+                metricChip('fa-id-card', 'Registration', dog.registration || 'N/A') +
+                metricChip('fa-shield-alt', 'Status', statusValue) +
+            '</div>';
 
         return '<div class="dog-detail-overlay open" id="dogDetailOverlay" onclick="if(event.target===this)App.closeDogDetail()">' +
-            '<div class="dog-detail-panel">' +
-            '<div class="detail-header">' +
+            '<div class="dog-detail-panel dog-profile-panel">' +
+            '<div class="detail-header dog-profile-header">' +
             '<button class="detail-close" onclick="App.closeDogDetail()"><i class="fas fa-times"></i></button>' +
-            '<div class="detail-header-content">' +
+            '<div class="dog-profile-hero">' +
             avatarHtml +
-            '<div class="detail-header-info">' +
+            '<div class="dog-profile-hero-content">' +
+            '<div class="dog-profile-title-row">' +
+            '<div class="dog-profile-title-block">' +
             '<h2>' + dog.name + '</h2>' +
             '<p>' + dog.breed + ' &bull; ' + age + '</p>' +
-            '<div class="detail-header-actions">' +
+            '</div>' +
+            '<div class="dog-profile-badges">' +
+            '<span class="tag ' + statusClass + '">' + statusValue + '</span>' +
+            (dog.forSale ? '<span class="tag tag-for-sale">For Sale</span>' : '<span class="tag tag-active">Kennel Owned</span>') +
+            '<span class="tag tag-retired">' + (dog.gender || 'Unknown') + '</span>' +
+            '</div></div>' +
+            '<div class="dog-profile-actions">' +
             '<button class="btn btn-sm" onclick="App.editDog(\'' + dog.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
             '<button class="btn btn-sm" onclick="App.toggleForSale(\'' + dog.id + '\')">' +
             '<i class="fas ' + (dog.forSale ? 'fa-times-circle' : 'fa-tag') + '"></i> ' +
@@ -331,24 +435,27 @@ const Components = {
             '</button>' +
             '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:var(--white);border:1px solid rgba(255,255,255,0.3)" onclick="App.deleteDogPrompt(\'' + dog.id + '\')">' +
             '<i class="fas fa-trash"></i> Delete' +
-            '</button></div></div>' +
-            '<div class="detail-body">' +
-            '<div class="detail-info-grid">' +
-            '<div class="detail-info-item"><label>Gender</label><p><i class="fas ' + genderIcon + '"></i> ' + dog.gender + '</p></div>' +
-            '<div class="detail-info-item"><label>Date of Birth</label><p>' + (dog.dob ? new Date(dog.dob).toLocaleDateString() : 'N/A') + '</p></div>' +
-            '<div class="detail-info-item"><label>Weight</label><p>' + (dog.weight ? dog.weight + ' kg' : 'N/A') + '</p></div>' +
-            '<div class="detail-info-item"><label>Color</label><p>' + (dog.color || 'N/A') + '</p></div>' +
-            '<div class="detail-info-item"><label>Microchip</label><p>' + (dog.microchip || 'N/A') + '</p></div>' +
-            '<div class="detail-info-item"><label>Registration</label><p>' + (dog.registration || 'N/A') + '</p></div>' +
-            '<div class="detail-info-item"><label>Status</label><p><span class="tag ' + statusClass + '">' + dog.status + '</span></p></div>' +
-            '<div class="detail-info-item"><label>For Sale</label><p>' + (dog.forSale ? (dog.price ? 'KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'Yes') : 'No') + '</p></div>' +
-            '</div>' +
-            notesHtml +
-            attachmentsHtml +
-            '<div class="records-section">' +
-            '<div class="records-tabs">' + tabsHtml + '</div>' +
-            contentsHtml +
-            '</div></div></div></div></div></div>';
+                '</button></div>' +
+                '</div></div>' +
+                '<div class="detail-body dog-profile-body">' +
+                '<div class="dog-profile-layout">' +
+                '<div class="dog-profile-column">' +
+                sectionCard('Overview', 'fa-layer-group', overviewMetricsHtml + '<div class="profile-copy">A quick scan of the dog’s core profile details.</div>', 'profile-section-overview') +
+                sectionCard('Identity', 'fa-id-card', identityHtml, 'profile-section-identity') +
+                sectionCard('Pedigree & background', 'fa-dna', pedigreeHtml, 'profile-section-pedigree') +
+                '</div>' +
+                '<div class="dog-profile-column">' +
+                sectionCard('Health snapshot', 'fa-heartbeat', healthSectionHtml, 'profile-section-health') +
+                sectionCard('Sale & ownership', 'fa-handshake', saleSectionHtml, 'profile-section-sale') +
+                notesHtml +
+                attachmentsHtml +
+                '<section class="records-section profile-section-card profile-section-records">' +
+                '<div class="profile-section-title"><i class="fas fa-clipboard-list"></i><h4>Medical & care records</h4></div>' +
+                '<div class="records-tabs">' + tabsHtml + '</div>' +
+                contentsHtml +
+                '</section>' +
+                '</div>' +
+                '</div></div></div></div></div>';
     },
 
     overviewPage: function() {
