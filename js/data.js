@@ -1179,6 +1179,7 @@ const KennelData = {
                     personInCharge: report.personInCharge || '',
                     healthStatus: status.healthStatus || '',
                     groomingStatus: status.groomingStatus || '',
+                    medication: status.medication || '',
                     notes: report.notes || ''
                 });
             }

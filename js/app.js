@@ -136,6 +136,25 @@ const App = {
             const dogSelect = document.getElementById('dailyReportDogSelect');
             const dogHealth = document.getElementById('dailyReportDogHealth');
             const dogGrooming = document.getElementById('dailyReportDogGrooming');
+            let dogMedication = document.getElementById('dailyReportDogMedication');
+            const legacyMedicationNotes = document.getElementById('dailyReportMedicationNotes');
+            if (legacyMedicationNotes) {
+                const legacyMedicationGroup = legacyMedicationNotes.closest('.form-group');
+                if (legacyMedicationGroup) legacyMedicationGroup.remove();
+            }
+            document.querySelectorAll('#pageDailyReport .detail-info-item label').forEach((label) => {
+                if (label.textContent.trim().toLowerCase() === 'medication notes') {
+                    const legacyMedicationItem = label.closest('.detail-info-item');
+                    if (legacyMedicationItem) legacyMedicationItem.remove();
+                }
+            });
+            if (!dogMedication && dogGrooming) {
+                const groomingGroup = dogGrooming.closest('.form-group');
+                if (groomingGroup) {
+                    groomingGroup.insertAdjacentHTML('afterend', '<div class="form-group"><label for="dailyReportDogMedication">Medication</label><input type="text" id="dailyReportDogMedication" placeholder="Medication and dose given"></div>');
+                    dogMedication = document.getElementById('dailyReportDogMedication');
+                }
+            }
             const puppySelect = document.getElementById('dailyReportPuppySelect');
             const puppyHealth = document.getElementById('dailyReportPuppyHealth');
             let dogStatuses = [];
@@ -159,7 +178,7 @@ const App = {
                 dogStatuses.forEach((entry, index) => {
                     const item = document.createElement('div');
                     item.className = 'detail-info-item';
-                    item.innerHTML = '<label>' + (entry.dogName || 'Dog') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' • Grooming: ' + (entry.groomingStatus || 'N/A') + ' <button type="button" class="btn-text-danger" data-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    item.innerHTML = '<label>' + (entry.dogName || 'Dog') + '</label><p>Health: ' + (entry.healthStatus || 'N/A') + ' • Grooming: ' + (entry.groomingStatus || 'N/A') + (entry.medication ? ' • Medication: ' + entry.medication : '') + ' <button type="button" class="btn-text-danger" data-index="' + index + '"><i class="fas fa-times"></i></button></p>';
                     statusList.appendChild(item);
                 });
                 statusList.querySelectorAll('button[data-index]').forEach((button) => {
@@ -200,13 +219,15 @@ const App = {
                     const label = dogSelect.options[dogSelect.selectedIndex]?.text || 'Dog';
                     const healthValue = dogHealth ? dogHealth.value.trim() : '';
                     const groomingValue = dogGrooming ? dogGrooming.value.trim() : '';
-                    if (!healthValue && !groomingValue) {
+                    const medicationValue = dogMedication ? dogMedication.value.trim() : '';
+                    if (!healthValue && !groomingValue && !medicationValue) {
                         Components.toast('Please add at least one status detail.', 'error');
                         return;
                     }
-                    dogStatuses.push({ dogId: dogSelect.value, dogName: label, healthStatus: healthValue, groomingStatus: groomingValue });
+                    dogStatuses.push({ dogId: dogSelect.value, dogName: label, healthStatus: healthValue, groomingStatus: groomingValue, medication: medicationValue });
                     dogHealth.value = '';
                     dogGrooming.value = '';
+                    if (dogMedication) dogMedication.value = '';
                     renderStatusList();
                 });
             }
@@ -238,7 +259,6 @@ const App = {
                     const kennelsWashedValue = document.getElementById('dailyReportKennelsWashed').checked;
                     const visitorsValue = document.getElementById('dailyReportVisitors').value.trim();
                     const personInChargeValue = document.getElementById('dailyReportPersonInCharge').value.trim();
-                    const medicationNotesValue = document.getElementById('dailyReportMedicationNotes').value.trim();
                     const cleaningChecklistValue = document.getElementById('dailyReportCleaningChecklist').value.trim();
                     const staffCommentsValue = document.getElementById('dailyReportStaffComments').value.trim();
                     const notesValue = document.getElementById('dailyReportNotes').value.trim();
@@ -255,7 +275,6 @@ const App = {
                         puppyStatuses: puppyStatuses,
                         visitors: visitorsValue,
                         personInCharge: personInChargeValue,
-                        medicationNotes: medicationNotesValue,
                         cleaningChecklist: cleaningChecklistValue,
                         staffComments: staffCommentsValue,
                         notes: notesValue
@@ -1108,10 +1127,10 @@ const App = {
 
     exportDailyReports() {
         const reports = KennelData.getDailyReports();
-        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,medicationNotes,cleaningChecklist,staffComments,notes,dogStatuses,puppyStatuses'];
+        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,cleaningChecklist,staffComments,notes,dogStatuses,puppyStatuses'];
         reports.forEach((report) => {
             const dogStatuses = (report.dogStatuses || []).map(function(item) {
-                return (item.dogName || 'Dog') + ': Health=' + (item.healthStatus || 'N/A') + '; Grooming=' + (item.groomingStatus || 'N/A');
+                return (item.dogName || 'Dog') + ': Health=' + (item.healthStatus || 'N/A') + '; Grooming=' + (item.groomingStatus || 'N/A') + '; Medication=' + (item.medication || 'N/A');
             }).join(' | ');
             const puppyStatuses = (report.puppyStatuses || []).map(function(item) {
                 return (item.puppyName || 'Puppy') + ': Health=' + (item.healthStatus || 'N/A');
@@ -1123,7 +1142,6 @@ const App = {
                 report.kennelsWashed ? 'Yes' : 'No',
                 (report.visitors || ''),
                 (report.personInCharge || ''),
-                (report.medicationNotes || ''),
                 (report.cleaningChecklist || ''),
                 (report.staffComments || ''),
                 (report.notes || ''),

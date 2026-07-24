@@ -242,6 +242,7 @@ const Components = {
             var dateText = entry.reportDate ? new Date(entry.reportDate).toLocaleDateString() : 'Date unknown';
             var meta = [];
             if (entry.groomingStatus) meta.push('Grooming: ' + entry.groomingStatus);
+            if (entry.medication) meta.push('Medication: ' + entry.medication);
             if (entry.personInCharge) meta.push('By: ' + entry.personInCharge);
             items += '<div class="record-item health">' +
                 '<div class="record-info">' +
@@ -639,18 +640,43 @@ const Components = {
         for (var i = 0; i < dogs.length; i++) {
             var dog = dogs[i];
             var healthRecords = (dog.records && dog.records.health) || [];
+            var dailyStatuses = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
+            var entries = [];
             var recordsHtml = '';
 
-            if (healthRecords.length === 0) {
+            for (var j = 0; j < healthRecords.length; j++) {
+                var record = healthRecords[j];
+                entries.push({
+                    date: record.date || '',
+                    title: record.type || 'Checkup',
+                    details: (record.vet ? 'Vet: ' + record.vet + ' • ' : '') + (record.notes || 'No notes')
+                });
+            }
+            for (var k = 0; k < dailyStatuses.length; k++) {
+                var status = dailyStatuses[k];
+                var details = [];
+                if (status.healthStatus) details.push('Health: ' + status.healthStatus);
+                if (status.groomingStatus) details.push('Grooming: ' + status.groomingStatus);
+                if (status.medication) details.push('Medication: ' + status.medication);
+                if (status.personInCharge) details.push('By: ' + status.personInCharge);
+                entries.push({
+                    date: status.reportDate || status.createdAt || '',
+                    title: 'Daily health status',
+                    details: details.join(' • ') || 'No details logged'
+                });
+            }
+
+            entries.sort(function(a, b) { return new Date(b.date || 0) - new Date(a.date || 0); });
+            if (entries.length === 0) {
                 recordsHtml = '<p style="color:var(--gray-400)">No health records yet.</p>';
             } else {
-                for (var j = 0; j < healthRecords.length; j++) {
-                    var record = healthRecords[j];
+                for (var m = 0; m < entries.length; m++) {
+                    var entry = entries[m];
                     recordsHtml += '<div class="alert-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
                         '<div class="alert-content">' +
-                        '<h4>' + (record.type || 'Checkup') + '</h4>' +
-                        '<p>' + (record.vet ? 'Vet: ' + record.vet + ' • ' : '') + (record.notes || 'No notes') + '</p>' +
-                        '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (record.date ? new Date(record.date).toLocaleDateString() : 'Date pending') + '</p>' +
+                        '<h4>' + entry.title + '</h4>' +
+                        '<p>' + entry.details + '</p>' +
+                        '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
                         '</div></div>';
                 }
             }
