@@ -214,6 +214,38 @@ const Components = {
             '<div class="records-list">' + items + '</div>';
     },
 
+    dailyHealthStatusList: function(dog) {
+        var entries = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
+        var addButton = '<div style="margin-bottom:12px">' +
+            '<button class="btn btn-primary btn-sm" onclick="App.openDailyReportForDog(\'' + dog.id + '\')">' +
+            '<i class="fas fa-plus"></i> Add Health Status' +
+            '</button></div>';
+
+        if (!entries.length) {
+            return addButton + '<div class="record-empty">' +
+                '<i class="fas fa-heartbeat"></i>' +
+                '<p>No health status updates from daily reports yet</p>' +
+                '</div>';
+        }
+
+        var items = '';
+        for (var i = 0; i < entries.length; i++) {
+            var entry = entries[i];
+            var dateText = entry.reportDate ? new Date(entry.reportDate).toLocaleDateString() : 'Date unknown';
+            var meta = [];
+            if (entry.groomingStatus) meta.push('Grooming: ' + entry.groomingStatus);
+            if (entry.personInCharge) meta.push('By: ' + entry.personInCharge);
+            items += '<div class="record-item health">' +
+                '<div class="record-info">' +
+                '<h4>' + (entry.healthStatus || 'Status not set') + '</h4>' +
+                '<p>' + dateText + (meta.length ? ' • ' + meta.join(' • ') : '') + '</p>' +
+                '</div>' +
+                '</div>';
+        }
+
+        return addButton + '<div class="records-list">' + items + '</div>';
+    },
+
     dogDetailPanel: function(dog) {
         var hasImage = dog.image && dog.image.trim() !== '';
         var age = dog.dob ? this.calculateAge(dog.dob) : 'Unknown';
@@ -249,8 +281,11 @@ const Components = {
             tabsHtml += '<button class="records-tab' + (isActive ? ' active' : '') + '" data-tab="' + rt.key + '">' +
                 '<i class="fas ' + rt.icon + '"></i> ' + rt.label +
                 '</button>';
+            var tabContent = rt.key === 'health'
+                ? this.dailyHealthStatusList(dog)
+                : this.recordList(dog.id, rt.key, records, rt.label);
             contentsHtml += '<div class="records-tab-content' + (isActive ? ' active' : '') + '" data-tab-content="' + rt.key + '">' +
-                this.recordList(dog.id, rt.key, records, rt.label) +
+                tabContent +
                 '</div>';
         }
 

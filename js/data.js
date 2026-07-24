@@ -1013,6 +1013,45 @@ const KennelData = {
         return this._dailyReports.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
     },
 
+    getDogDailyHealthStatuses(dogId, dogName) {
+        var reports = this.getDailyReports();
+        var normalizedName = (dogName || '').toLowerCase().trim();
+        var entries = [];
+
+        for (var i = 0; i < reports.length; i++) {
+            var report = reports[i] || {};
+            var statuses = Array.isArray(report.dogStatuses) ? report.dogStatuses : [];
+            for (var j = 0; j < statuses.length; j++) {
+                var status = statuses[j] || {};
+                var statusName = (status.dogName || '').toLowerCase().trim();
+                var matchesId = status.dogId && dogId && status.dogId === dogId;
+                var matchesName = normalizedName && statusName && statusName === normalizedName;
+
+                if (!matchesId && !matchesName) {
+                    continue;
+                }
+
+                entries.push({
+                    reportId: report.id || '',
+                    reportDate: report.date || '',
+                    createdAt: report.createdAt || '',
+                    personInCharge: report.personInCharge || '',
+                    healthStatus: status.healthStatus || '',
+                    groomingStatus: status.groomingStatus || '',
+                    notes: report.notes || ''
+                });
+            }
+        }
+
+        entries.sort(function(a, b) {
+            var aDate = new Date(a.reportDate || a.createdAt || 0);
+            var bDate = new Date(b.reportDate || b.createdAt || 0);
+            return bDate - aDate;
+        });
+
+        return entries;
+    },
+
     addDailyReport(report) {
         const entry = Object.assign({ id: 'dr' + Date.now(), createdAt: new Date().toISOString() }, report);
         return this._request('/daily-reports', {

@@ -8,6 +8,7 @@ const App = {
     currentDogViewFilters: { gender: '', search: '', sale: '' },
     selectedDogImageFiles: [],
     currentInvoiceEntryId: null,
+    pendingDailyReportDogId: null,
     navigationHistory: [],
 
     // ===== Initialize =====
@@ -139,6 +140,14 @@ const App = {
             const puppyHealth = document.getElementById('dailyReportPuppyHealth');
             let dogStatuses = [];
             let puppyStatuses = [];
+
+            if (dogSelect && this.pendingDailyReportDogId) {
+                dogSelect.value = this.pendingDailyReportDogId;
+                this.pendingDailyReportDogId = null;
+                if (dogHealth) {
+                    setTimeout(function() { dogHealth.focus(); }, 0);
+                }
+            }
 
             const renderStatusList = () => {
                 if (!statusList) return;
@@ -977,6 +986,13 @@ const App = {
         KennelData.deletePuppy(puppyId);
         Components.toast('Puppy removed from the list');
         this.render();
+    },
+
+    openDailyReportForDog(dogId) {
+        this.pendingDailyReportDogId = dogId;
+        this.closeDogDetail();
+        this.navigate('dailyreport');
+        Components.toast('Add health status in Daily Report for this dog.');
     },
 
     editPuppy(puppyId) {
