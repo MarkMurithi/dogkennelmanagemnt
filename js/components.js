@@ -856,11 +856,9 @@ const Components = {
             '</div></div>';
     },
 
-    myDogsPage: function(filterGender, searchQuery, saleFilter) {
-        if (filterGender === undefined) filterGender = '';
-        if (searchQuery === undefined) searchQuery = '';
-        if (saleFilter === undefined) saleFilter = '';
-
+    // Shared by myDogsPage (full render) and App.searchDogs/filterDogs (partial
+    // grid-only update) so filtering doesn't require rebuilding the whole page.
+    _buildDogResults: function(filterGender, searchQuery, saleFilter) {
         var dogs = KennelData.getDogs();
         if (searchQuery) {
             var q = searchQuery.toLowerCase();
@@ -878,7 +876,7 @@ const Components = {
 
         var emptyHtml = '';
         if (dogs.length === 0) {
-            emptyHtml = '<div style="text-align:center;padding:60px 20px;color:var(--gray-400)">' +
+            emptyHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)">' +
                 '<i class="fas fa-dog" style="font-size:3rem;margin-bottom:16px;display:block"></i>' +
                 '<p style="font-size:1.1rem">No dogs found</p>' +
                 '<button class="btn btn-primary" style="margin-top:16px" onclick="App.showAddDog()">Add Your First Dog</button>' +
@@ -890,6 +888,19 @@ const Components = {
             dogCardsHtml += this.dogCard(dogs[i]);
         }
 
+        return { dogs: dogs, dogCardsHtml: dogCardsHtml, emptyHtml: emptyHtml };
+    },
+
+    myDogsPage: function(filterGender, searchQuery, saleFilter) {
+        if (filterGender === undefined) filterGender = '';
+        if (searchQuery === undefined) searchQuery = '';
+        if (saleFilter === undefined) saleFilter = '';
+
+        var results = this._buildDogResults(filterGender, searchQuery, saleFilter);
+        var dogs = results.dogs;
+        var dogCardsHtml = results.dogCardsHtml;
+        var emptyHtml = results.emptyHtml;
+
         return '<div class="page-shell" id="pageMyDogs">' +
             '<section class="page-hero">' +
             '<div>' +
@@ -900,7 +911,7 @@ const Components = {
             '<div class="hero-actions"><button class="btn btn-primary" onclick="App.showAddDog()"><i class="fas fa-plus"></i> Add Dog</button></div>' +
             '</section>' +
             '<div class="section-header">' +
-            '<h2><i class="fas fa-dog"></i> My Dogs <span style="font-size:0.9rem;font-weight:400;color:var(--gray-500)">(' + dogs.length + ')</span></h2>' +
+            '<h2><i class="fas fa-dog"></i> My Dogs <span class="dog-count-badge" style="font-size:0.9rem;font-weight:400;color:var(--gray-500)">(' + dogs.length + ')</span></h2>' +
             '<div class="section-badge"><i class="fas fa-filter"></i> Filtered view</div>' +
             '</div>' +
             '<div class="search-bar">' +

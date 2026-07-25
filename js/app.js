@@ -13,6 +13,7 @@ const App = {
     navigationHistory: [],
     submissionStatusPollId: null,
     sessionWatchdogId: null,
+    dataSyncPollId: null,
     chatPollId: null,
     chatMessages: [],
     chatLastTimestamp: '',
@@ -33,8 +34,10 @@ const App = {
         this.setupInvoiceModal();
         this.render();
 
-        // Subscribe to data changes
-        KennelData.subscribe(() => this.render());
+        // Subscribe to data changes. Renders are scheduled (coalesced) rather than
+        // run synchronously so several near-simultaneous data updates (e.g. a sync
+        // that touches multiple collections) only trigger a single page rebuild.
+        KennelData.subscribe(() => this._scheduleRender());
 
         if (KennelData.isAuthenticated()) {
             this.startSubmissionStatusPolling();
@@ -249,6 +252,28 @@ const App = {
                     }
                 });
             }).catch(function() {});
+        }, 20000);
+    },
+
+    // Periodically pulls fresh dogs/puppies/finance/events/reports/activities from
+    // the server so changes made by other users/devices show up automatically,
+    // instead of requiring a manual page reload. Uses refreshFromServer (silent),
+    // which only triggers a re-render if something actually changed.
+    startDataSyncPolling() {
+        if (this.dataSyncPollId) {
+            clearInterval(this.dataSyncPollId);
+            this.dataSyncPollId = null;
+        }
+        if (!KennelData.isAuthenticated()) {
+            return;
+        }
+        this.dataSyncPollId = window.setInterval(() => {
+            if (!KennelData.isAuthenticated()) {
+                clearInterval(this.dataSyncPollId);
+                this.dataSyncPollId = null;
+                return;
+            }
+            KennelData.refreshFromServer().catch(function() {});
         }, 20000);
     },
 
@@ -1159,6 +1184,10 @@ const App = {
                 clearInterval(this.sessionWatchdogId);
                 this.sessionWatchdogId = null;
             }
+            if (this.dataSyncPollId) {
+                clearInterval(this.dataSyncPollId);
+                this.dataSyncPollId = null;
+            }
             if (this.chatPollId) {
                 // Setting this to null causes the in-flight long-poll loop (which checks
                 // this token before recursing) to stop itself on its next iteration.
@@ -1193,6 +1222,10 @@ const App = {
             this.startSessionWatchdog();
         }
 
+        if (!this.dataSyncPollId) {
+            this.startDataSyncPolling();
+        }
+
         if (!this.chatPollId) {
             this.startChatPoll();
         }
@@ -1201,6 +1234,10 @@ const App = {
             this.currentPage = 'overview';
         }
         this.updateNavigationVisibility();
+
+        // Preserve scroll position when re-rendering the same page (e.g. after a
+        // background data sync or polling tick), instead of jumping back to the top.
+        const preservedScrollTop = (main && this._lastRenderedPage === this.currentPage) ? main.scrollTop : 0;
 
         switch(this.currentPage) {
             case 'overview':
@@ -1250,11 +1287,29 @@ const App = {
         this.animateOverviewCounters();
         this.initKennelCarousel();
 
+        if (preservedScrollTop) {
+            main.scrollTop = preservedScrollTop;
+        }
+        this._lastRenderedPage = this.currentPage;
+
         // Update badge
         const badge = document.getElementById('totalDogsBadge');
         if (badge) {
             badge.textContent = KennelData.getDogs().length + ' dogs';
         }
+    },
+
+    // Coalesces multiple render() triggers that happen close together (e.g. several
+    // data-change notifications firing in the same tick) into a single rebuild on
+    // the next animation frame, avoiding redundant full-page rebuilds.
+    _scheduleRender() {
+        if (this._renderScheduled) return;
+        this._renderScheduled = true;
+        const raf = window.requestAnimationFrame || function(cb) { return window.setTimeout(cb, 16); };
+        raf(() => {
+            this._renderScheduled = false;
+            this.render();
+        });
     },
 
     // ===== Dog CRUD =====
@@ -2070,12 +2125,38 @@ const App = {
     },
 
     // ===== Search & Filter =====
+    // Updates only the dog-grid contents (not the whole page), so the search input
+    // never loses focus/cursor position and typing doesn't feel laggy on large lists.
+    _applyDogFilters(genderFilter, searchQuery, saleFilter) {
+        const results = Components._buildDogResults(genderFilter, searchQuery, saleFilter);
+        const grid = document.querySelector('#pageMyDogs .dog-grid');
+        if (grid) grid.innerHTML = results.dogCardsHtml;
+        const countBadge = document.querySelector('#pageMyDogs .dog-count-badge');
+        if (countBadge) countBadge.textContent = '(' + results.dogs.length + ')';
+        const pageEl = document.getElementById('pageMyDogs');
+        let emptyEl = pageEl ? pageEl.querySelector('.dog-empty-state') : null;
+        if (results.dogs.length === 0) {
+            if (!emptyEl && pageEl) {
+                pageEl.insertAdjacentHTML('beforeend', results.emptyHtml);
+            }
+        } else if (emptyEl) {
+            emptyEl.remove();
+        }
+    },
+
     searchDogs(query) {
         this.currentDogViewFilters.search = query || '';
-        const genderFilter = document.getElementById('genderFilter')?.value || '';
-        const saleFilter = document.getElementById('saleFilter')?.value || '';
-        const main = document.getElementById('mainContent');
-        main.innerHTML = Components.myDogsPage(genderFilter, this.currentDogViewFilters.search, saleFilter);
+        // Debounce the (potentially expensive) grid rebuild so it only runs once
+        // the user pauses typing, instead of on every single keystroke.
+        if (this._dogSearchDebounceId) {
+            clearTimeout(this._dogSearchDebounceId);
+        }
+        this._dogSearchDebounceId = setTimeout(() => {
+            this._dogSearchDebounceId = null;
+            const genderFilter = document.getElementById('genderFilter')?.value || '';
+            const saleFilter = document.getElementById('saleFilter')?.value || '';
+            this._applyDogFilters(genderFilter, this.currentDogViewFilters.search, saleFilter);
+        }, 150);
     },
 
     filterDogs() {
@@ -2083,8 +2164,7 @@ const App = {
         this.currentDogViewFilters.search = searchQuery;
         this.currentDogViewFilters.gender = document.getElementById('genderFilter')?.value || '';
         this.currentDogViewFilters.sale = document.getElementById('saleFilter')?.value || '';
-        const main = document.getElementById('mainContent');
-        main.innerHTML = Components.myDogsPage(this.currentDogViewFilters.gender, this.currentDogViewFilters.search, this.currentDogViewFilters.sale);
+        this._applyDogFilters(this.currentDogViewFilters.gender, searchQuery, this.currentDogViewFilters.sale);
     }
 };
 

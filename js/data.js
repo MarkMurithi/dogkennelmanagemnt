@@ -290,14 +290,18 @@ const KennelData = {
         }.bind(this));
     },
 
+    // Returns a promise resolving to true if the collection's contents actually
+    // changed, so callers can decide whether a re-render/notify is warranted.
     _syncCollection(path, targetKey, options) {
         const settings = Object.assign({ clearOnForbidden: false }, options || {});
         return this._requestWithMeta(path).then(function(result) {
             if (result.ok && Array.isArray(result.data)) {
+                const before = JSON.stringify(this[targetKey]);
+                const after = JSON.stringify(result.data);
                 this[targetKey] = result.data;
                 this._save();
                 this._setServerState('online', '');
-                return;
+                return before !== after;
             }
 
             if (result.status === 401) {
@@ -305,22 +309,29 @@ const KennelData = {
                 this._clearAuthState();
                 this._save();
                 this._setServerState('auth', 'Your session expired. Sign in again to load kennel data.');
-                return;
+                return true;
             }
 
             if (result.status === 403 && settings.clearOnForbidden) {
+                const hadData = this[targetKey] && this[targetKey].length > 0;
                 this[targetKey] = [];
                 this._save();
-                return;
+                return hadData;
             }
 
             if (result.status === 0) {
                 this._setServerState('offline', 'Cannot reach the kennel server. Make sure your laptop server is running, then reopen the app from that laptop address.');
             }
+            return false;
         }.bind(this));
     },
 
-    _syncFromServer() {
+    // options.silent: when true, only notifies subscribers (triggering a re-render)
+    // if at least one collection actually changed, instead of unconditionally
+    // re-rendering. Used for background polling so the UI doesn't rebuild/flicker
+    // every cycle when nothing new has happened.
+    _syncFromServer(options) {
+        const silent = Boolean(options && options.silent);
         const requests = [
             this._syncCollection('/dogs', '_dogs'),
             this._syncCollection('/puppies', '_puppies'),
@@ -330,10 +341,20 @@ const KennelData = {
             this._syncCollection('/activities', '_activities'),
             this._syncCollection('/my-submissions', '_mySubmissions')
         ];
-        return Promise.all(requests).then(function() {
+        return Promise.all(requests).then(function(changedFlags) {
             this._primeSubmissionStatusCache();
-            this._notify();
+            const anyChanged = changedFlags.some(Boolean);
+            if (!silent || anyChanged) {
+                this._notify();
+            }
         }.bind(this));
+    },
+
+    // Public wrapper for background polling to pull in changes made by other
+    // users/devices (new dogs, records, reports, etc.) without needing a manual
+    // page reload. Only triggers a UI re-render if something actually changed.
+    refreshFromServer() {
+        return this._syncFromServer({ silent: true });
     },
 
     _resetEmptyState() {
