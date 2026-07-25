@@ -1009,19 +1009,49 @@ const Components = {
         var userRows = '';
         var pendingRows = '';
 
+        var editingUserId = (typeof App !== 'undefined') ? App.editingUserId : null;
+
         if (!users.length) {
             userRows = '<p style="color:var(--gray-400)">No users yet.</p>';
         } else {
             for (var i = 0; i < users.length; i++) {
                 var item = users[i];
-                userRows += '<div class="card section-card" style="margin-bottom:10px">' +
-                    '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
-                    '<div><strong>' + (item.name || 'Unnamed user') + '</strong><br><span style="color:var(--gray-500);font-size:0.9rem">' + (item.email || '') + ' • ' + (item.role || 'staff') + '</span></div>' +
-                    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                    (item.active === false ? '<span class="status-pill">Disabled</span>' : '<span class="status-pill active">Active</span>') +
-                    '<button class="btn btn-sm btn-secondary" onclick="App.toggleUserActive(\'' + item.id + '\')">' + (item.active === false ? 'Enable' : 'Disable') + '</button>' +
-                    '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')">Edit</button>' +
-                    '</div></div></div>';
+                var safe = this.escapeHtml.bind(this);
+                if (editingUserId === item.id) {
+                    // Inline edit form
+                    userRows += '<div class="card section-card" style="margin-bottom:10px">' +
+                        '<div class="card-body">' +
+                        '<div class="modern-form" style="display:grid;gap:10px">' +
+                        '<div class="form-row">' +
+                        '<div class="form-group half"><label>Name</label><input type="text" id="editUserName" value="' + safe(item.name || '') + '"></div>' +
+                        '<div class="form-group half"><label>Email</label><input type="email" id="editUserEmail" value="' + safe(item.email || '') + '"></div>' +
+                        '</div>' +
+                        '<div class="form-row">' +
+                        '<div class="form-group half"><label>Role</label><select id="editUserRole">' +
+                        '<option value="staff"' + (item.role === 'staff' ? ' selected' : '') + '>Staff</option>' +
+                        '<option value="reviewer"' + (item.role === 'reviewer' ? ' selected' : '') + '>Reviewer</option>' +
+                        '<option value="admin"' + (item.role === 'admin' ? ' selected' : '') + '>Admin</option>' +
+                        '</select></div>' +
+                        '<div class="form-group half" style="display:flex;align-items:center;gap:8px;padding-top:22px">' +
+                        '<input type="checkbox" id="editUserActive"' + (item.active !== false ? ' checked' : '') + ' style="width:auto;min-height:auto">' +
+                        '<label for="editUserActive" style="margin:0">Account active</label>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                        '<button class="btn btn-primary btn-sm" onclick="App.saveUserEdit(\'' + item.id + '\')"><i class="fas fa-save"></i> Save</button>' +
+                        '<button class="btn btn-secondary btn-sm" onclick="App.cancelUserEdit()">Cancel</button>' +
+                        '</div></div></div></div>';
+                } else {
+                    userRows += '<div class="card section-card" style="margin-bottom:10px">' +
+                        '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+                        '<div><strong>' + safe(item.name || 'Unnamed user') + '</strong><br>' +
+                        '<span style="color:var(--gray-500);font-size:0.9rem">' + safe(item.email || '') + ' &bull; ' + safe(item.role || 'staff') + '</span></div>' +
+                        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+                        (item.active === false ? '<span class="status-pill">Disabled</span>' : '<span class="status-pill active">Active</span>') +
+                        '<button class="btn btn-sm btn-secondary" onclick="App.toggleUserActive(\'' + item.id + '\')">' + (item.active === false ? 'Enable' : 'Disable') + '</button>' +
+                        '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
+                        '</div></div></div>';
+                }
             }
         }
 

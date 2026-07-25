@@ -13,6 +13,8 @@ const App = {
     navigationHistory: [],
     submissionStatusPollId: null,
     lastFinanceSnapshot: null,
+    _settingsDataLoaded: false,
+    editingUserId: null,
 
     // ===== Initialize =====
     init() {
@@ -141,6 +143,12 @@ const App = {
 
         this.currentPage = page;
 
+        // Reset settings data load flag when navigating to/from settings
+        if (page !== 'settings') {
+            this._settingsDataLoaded = false;
+            this.editingUserId = null;
+        }
+
         if (page === 'mydogs') {
             const filterOptions = options || {};
             this.currentDogViewFilters = {
@@ -161,7 +169,8 @@ const App = {
 
     setupPageInteractions() {
         if (this.currentPage === 'settings') {
-            if (KennelData.getCurrentUserRole() === 'admin') {
+            if (KennelData.getCurrentUserRole() === 'admin' && !this._settingsDataLoaded) {
+                this._settingsDataLoaded = true;
                 KennelData.loadUsers().catch(function() {});
                 KennelData.loadPendingApprovals().catch(function() {});
             }
@@ -587,26 +596,51 @@ const App = {
     },
 
     editUser(userId) {
-        const user = KennelData.getUsers().find(function(item) { return item.id === userId; });
-        if (!user) return;
-        const name = window.prompt('User name', user.name || '');
-        if (name === null) return;
-        const email = window.prompt('Email', user.email || '');
-        if (email === null) return;
-        const role = window.prompt('Role (admin, reviewer, or staff)', user.role || 'staff');
-        if (role === null) return;
-        const active = window.confirm('Enable this account?');
+        this.editingUserId = userId;
+        this.render();
+    },
+
+    cancelUserEdit() {
+        this.editingUserId = null;
+        this.render();
+    },
+
+    saveUserEdit(userId) {
+        const name = document.getElementById('editUserName');
+        const email = document.getElementById('editUserEmail');
+        const role = document.getElementById('editUserRole');
+        const active = document.getElementById('editUserActive');
+        if (!name || !email || !role) return;
+        if (!name.value.trim() || !email.value.trim()) {
+            Components.toast('Name and email are required.', 'error');
+            return;
+        }
         KennelData.updateUser(userId, {
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            role: role.trim().toLowerCase(),
-            active: active
+            name: name.value.trim(),
+            email: email.value.trim().toLowerCase(),
+            role: role.value,
+            active: active ? active.checked : true
         }).then(function(result) {
             if (result.ok) {
                 Components.toast('User updated successfully');
+                this.editingUserId = null;
                 this.render();
             } else {
                 Components.toast(result.error || 'Unable to update user', 'error');
+            }
+        }.bind(this));
+    },
+
+    deleteUser(userId) {
+        const user = KennelData.getUsers().find(function(item) { return item.id === userId; });
+        if (!user) return;
+        if (!window.confirm('Delete user ' + (user.name || user.email) + '? This cannot be undone.')) return;
+        KennelData.deleteUser(userId).then(function(result) {
+            if (result && result.ok) {
+                Components.toast('User deleted');
+                this.render();
+            } else {
+                Components.toast((result && result.error) || 'Unable to delete user', 'error');
             }
         }.bind(this));
     },

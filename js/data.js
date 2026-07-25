@@ -1040,6 +1040,21 @@ const KennelData = {
         });
     },
 
+    deleteUser(id) {
+        return this._request('/users/' + id, {
+            method: 'DELETE'
+        }).then(function(result) {
+            if (result && result.ok) {
+                this._users = this._users.filter(function(item) { return item.id !== id; });
+                this._save();
+                this._notify();
+            }
+            return result || { ok: false, error: 'No response from server.' };
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to delete user.' };
+        });
+    },
+
     resetPassword(email, newPassword, confirmPassword) {
         const normalizedEmail = String(email || '').trim().toLowerCase();
         const password = String(newPassword || '');
