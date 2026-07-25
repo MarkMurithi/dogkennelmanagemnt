@@ -1440,12 +1440,55 @@ const App = {
                 return;
             }
 
-            const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image
-            const oversizedFile = this.selectedDogImageFiles.find((file) => file.size > MAX_IMAGE_BYTES);
+            const MAX_SOURCE_IMAGE_BYTES = 30 * 1024 * 1024; // sanity cap on the original file, before compression
+            const oversizedFile = this.selectedDogImageFiles.find((file) => file.size > MAX_SOURCE_IMAGE_BYTES);
             if (oversizedFile) {
-                Components.toast(`"${oversizedFile.name}" is too large (max 8MB per image). Please choose a smaller photo.`, 'error');
+                Components.toast(`"${oversizedFile.name}" is too large. Please choose a smaller photo.`, 'error');
                 return;
             }
+
+            // Photos straight from a phone camera are often 8-20MB, which can make
+            // saving slow or get rejected. Resize/re-encode to a reasonable max
+            // dimension and JPEG quality client-side so any photo can be saved.
+            const compressImageFile = (file, maxDimension, quality) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(new Error('read-failed'));
+                    reader.onload = () => {
+                        const img = new Image();
+                        img.onerror = () => reject(new Error('decode-failed'));
+                        img.onload = () => {
+                            let width = img.naturalWidth || img.width;
+                            let height = img.naturalHeight || img.height;
+                            if (!width || !height) {
+                                resolve(reader.result);
+                                return;
+                            }
+                            if (width > maxDimension || height > maxDimension) {
+                                if (width >= height) {
+                                    height = Math.round(height * (maxDimension / width));
+                                    width = maxDimension;
+                                } else {
+                                    width = Math.round(width * (maxDimension / height));
+                                    height = maxDimension;
+                                }
+                            }
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            try {
+                                resolve(canvas.toDataURL('image/jpeg', quality));
+                            } catch (err) {
+                                resolve(reader.result);
+                            }
+                        };
+                        img.src = reader.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
 
             const saveBtn = document.getElementById('dogModalSave');
             const saveBtnOriginalHtml = saveBtn ? saveBtn.innerHTML : '';
@@ -1517,15 +1560,9 @@ const App = {
                 let done = 0;
                 let failed = false;
                 this.selectedDogImageFiles.forEach((file, index) => {
-                    const reader = new FileReader();
-                    reader.onerror = () => {
+                    compressImageFile(file, 1600, 0.82).then((dataUrl) => {
                         if (failed) return;
-                        failed = true;
-                        onFileReadError(file.name);
-                    };
-                    reader.onload = () => {
-                        if (failed) return;
-                        attachments[index] = reader.result;
+                        attachments[index] = dataUrl;
                         done += 1;
                         if (done === this.selectedDogImageFiles.length) {
                             const pedigreeFile = this.selectedDogPedigreeCertificate;
@@ -1538,8 +1575,11 @@ const App = {
                                 finalizeSave(attachments[0], attachments);
                             }
                         }
-                    };
-                    reader.readAsDataURL(file);
+                    }).catch(() => {
+                        if (failed) return;
+                        failed = true;
+                        onFileReadError(file.name);
+                    });
                 });
             } else {
                 const pedigreeFile = this.selectedDogPedigreeCertificate;
