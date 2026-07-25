@@ -1456,7 +1456,12 @@ const App = {
                     reader.onerror = () => reject(new Error('read-failed'));
                     reader.onload = () => {
                         const img = new Image();
-                        img.onerror = () => reject(new Error('decode-failed'));
+                        // Some formats the file picker allows (e.g. HEIC/HEIF from iPhones,
+                        // certain camera RAW/TIFF variants) can be read as raw bytes by
+                        // FileReader but not decoded by <img>/canvas in every browser. Rather
+                        // than failing the whole save, fall back to uploading the original,
+                        // uncompressed file in that case.
+                        img.onerror = () => resolve(reader.result);
                         img.onload = () => {
                             let width = img.naturalWidth || img.width;
                             let height = img.naturalHeight || img.height;
