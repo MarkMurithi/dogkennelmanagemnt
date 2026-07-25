@@ -308,6 +308,7 @@ const App = {
 
             if (saveBtn) {
                 saveBtn.addEventListener('click', () => {
+                    if (!this._requireEditAccess()) return;
                     if (!form) return;
                     const dateValue = document.getElementById('dailyReportDate').value;
                     const foodRemainingValue = document.getElementById('dailyReportFoodRemaining').value;
@@ -539,6 +540,7 @@ const App = {
             if (form) {
                 form.onsubmit = (e) => {
                     e.preventDefault();
+                    if (!this._requireEditAccess()) return;
                     const entry = {
                         type: document.getElementById('financeType').value,
                         title: document.getElementById('financeTitle').value.trim(),
@@ -595,7 +597,17 @@ const App = {
         });
     },
 
+    // ===== Role Access Guard =====
+    _requireEditAccess() {
+        if (KennelData.getCurrentUserRole() === 'reviewer') {
+            Components.toast('Access denied — reviewers can only view data.', 'error');
+            return false;
+        }
+        return true;
+    },
+
     editUser(userId) {
+        if (!this._requireEditAccess()) return;
         this.editingUserId = userId;
         this.render();
     },
@@ -606,6 +618,7 @@ const App = {
     },
 
     saveUserEdit(userId) {
+        if (!this._requireEditAccess()) return;
         const name = document.getElementById('editUserName');
         const email = document.getElementById('editUserEmail');
         const role = document.getElementById('editUserRole');
@@ -632,6 +645,7 @@ const App = {
     },
 
     deleteUser(userId) {
+        if (!this._requireEditAccess()) return;
         const user = KennelData.getUsers().find(function(item) { return item.id === userId; });
         if (!user) return;
         if (!window.confirm('Delete user ' + (user.name || user.email) + '? This cannot be undone.')) return;
@@ -646,6 +660,7 @@ const App = {
     },
 
     toggleUserActive(userId) {
+        if (!this._requireEditAccess()) return;
         const user = KennelData.getUsers().find(function(item) { return item.id === userId; });
         if (!user) return;
         KennelData.updateUser(userId, { active: !Boolean(user.active) }).then(function(result) {
@@ -659,6 +674,7 @@ const App = {
     },
 
     approvePendingApproval(approvalId) {
+        if (!this._requireEditAccess()) return;
         if (!window.confirm('Approve this pending submission?')) {
             return;
         }
@@ -673,6 +689,7 @@ const App = {
     },
 
     rejectPendingApproval(approvalId) {
+        if (!this._requireEditAccess()) return;
         const notes = window.prompt('Add a rejection note', 'Rejected');
         if (notes === null) {
             return;
@@ -689,6 +706,7 @@ const App = {
 
     handleCreateUser(event) {
         event.preventDefault();
+        if (!this._requireEditAccess()) return;
         const nameInput = document.getElementById('newUserName');
         const emailInput = document.getElementById('newUserEmail');
         const passwordInput = document.getElementById('newUserPassword');
@@ -943,6 +961,7 @@ const App = {
 
     // ===== Dog CRUD =====
     showAddDog() {
+        if (!this._requireEditAccess()) return;
         this.editingDogId = null;
         document.getElementById('dogModalTitle').textContent = 'Add New Dog';
         document.getElementById('dogForm').reset();
@@ -964,6 +983,7 @@ const App = {
     },
 
     editDog(dogId) {
+        if (!this._requireEditAccess()) return;
         this.editingDogId = dogId;
         const dog = KennelData.getDog(dogId);
         if (!dog) return;
@@ -1175,6 +1195,7 @@ const App = {
     },
 
     deletePuppy(puppyId) {
+        if (!this._requireEditAccess()) return;
         KennelData.deletePuppy(puppyId).then((result) => {
             if (!result || !result.ok) {
                 Components.toast(result && result.error ? result.error : 'Unable to remove puppy', 'error');
@@ -1197,6 +1218,7 @@ const App = {
     },
 
     editPuppy(puppyId) {
+        if (!this._requireEditAccess()) return;
         const puppy = KennelData.getPuppies().find(function(item) { return item.id === puppyId; });
         if (!puppy) {
             Components.toast('Unable to find this puppy record.', 'error');
@@ -1273,6 +1295,7 @@ const App = {
     },
 
     deleteFinanceEntry(entryId) {
+        if (!this._requireEditAccess()) return;
         KennelData.deleteFinanceEntry(entryId).then((result) => {
             if (!result || !result.ok) {
                 Components.toast(result && result.error ? result.error : 'Unable to remove finance entry', 'error');
@@ -1288,6 +1311,7 @@ const App = {
     },
 
     resetAppData() {
+        if (!this._requireEditAccess()) return;
         if (!window.confirm('This will clear all dogs, puppies, records, and alerts. Continue?')) {
             return;
         }
@@ -1406,6 +1430,7 @@ const App = {
     },
 
     importData() {
+        if (!this._requireEditAccess()) return;
         document.getElementById('importDataInput')?.click();
     },
 
@@ -1431,6 +1456,7 @@ const App = {
 
     // ===== Delete Dog =====
     deleteDogPrompt(dogId) {
+        if (!this._requireEditAccess()) return;
         const dog = KennelData.getDog(dogId);
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete ${dog.name}? This action cannot be undone.`;
         document.getElementById('deleteModal').classList.add('open');
@@ -1455,6 +1481,7 @@ const App = {
 
     // ===== Records Management =====
     addRecord(dogId, recordType) {
+        if (!this._requireEditAccess()) return;
         this.editingRecord = null;
         const recordDogId = document.getElementById('recordDogId');
         const recordTypeInput = document.getElementById('recordType');
@@ -1482,6 +1509,7 @@ const App = {
     },
 
     editRecord(dogId, recordType, recordId) {
+        if (!this._requireEditAccess()) return;
         const records = KennelData.getRecords(dogId, recordType);
         const record = records.find(r => r.id === recordId);
         if (!record) return;
@@ -1607,6 +1635,7 @@ const App = {
     },
 
     deleteRecord(dogId, recordType, recordId) {
+        if (!this._requireEditAccess()) return;
         const dog = KennelData.getDog(dogId);
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete this record for ${dog.name}?`;
         document.getElementById('deleteModal').classList.add('open');
@@ -1628,6 +1657,7 @@ const App = {
     },
 
     markAlertDone(dogId, recordType, recordId, dueValue) {
+        if (!this._requireEditAccess()) return;
         if (!dogId || !recordType || !recordId) {
             Components.toast('Unable to mark this reminder as done.', 'error');
             return;
@@ -1653,6 +1683,7 @@ const App = {
     },
 
     postponeCalendarUpcoming(dogId, recordType, recordId, dueField, currentDueValue) {
+        if (!this._requireEditAccess()) return;
         if (!dogId || !recordType || !recordId) {
             Components.toast('Unable to postpone this item.', 'error');
             return;

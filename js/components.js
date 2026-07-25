@@ -207,8 +207,10 @@ const Components = {
             '<p>' + safe(dateStr + (details ? ' ' + details : '')) + '</p>' +
             '</div>' +
             '<div class="record-actions">' +
-            '<button class="btn-text" onclick="App.editRecord(\'' + dogId + '\',\'' + recordType + '\',\'' + record.id + '\')"><i class="fas fa-edit"></i></button>' +
-            '<button class="btn-text-danger" onclick="App.deleteRecord(\'' + dogId + '\',\'' + recordType + '\',\'' + record.id + '\')"><i class="fas fa-trash"></i></button>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<button class="btn-text" onclick="App.editRecord(\'' + dogId + '\',\'' + recordType + '\',\'' + record.id + '\')"><i class="fas fa-edit"></i></button>' +
+                  '<button class="btn-text-danger" onclick="App.deleteRecord(\'' + dogId + '\',\'' + recordType + '\',\'' + record.id + '\')"><i class="fas fa-trash"></i></button>'
+                : '') +
             '</div>' +
             '</div>';
     },
@@ -218,9 +220,10 @@ const Components = {
             return '<div class="record-empty">' +
                 '<i class="fas fa-clipboard-list"></i>' +
                 '<p>No ' + label.toLowerCase() + ' records yet</p>' +
-                '<button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')">' +
-                '<i class="fas fa-plus"></i> Add ' + label +
-                '</button></div>';
+                (KennelData.getCurrentUserRole() !== 'reviewer'
+                    ? '<button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')"><i class="fas fa-plus"></i> Add ' + label + '</button>'
+                    : '') +
+                '</div>';
         }
         var sortedRecords = records.slice().sort(function(a, b) {
             var aDate = a.nextDue ? new Date(a.nextDue) : (a.date ? new Date(a.date) : (a.startDate ? new Date(a.startDate) : new Date(0)));
@@ -232,9 +235,10 @@ const Components = {
             items += this.recordItem(dogId, recordType, sortedRecords[i]);
         }
         return '<div style="margin-bottom:12px">' +
-            '<button class="btn btn-primary btn-sm" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')">' +
-            '<i class="fas fa-plus"></i> Add ' + label +
-            '</button></div>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<button class="btn btn-primary btn-sm" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')"><i class="fas fa-plus"></i> Add ' + label + '</button>'
+                : '') +
+            '</div>' +
             '<div class="records-list-scroll"><div class="records-list">' + items + '</div></div>';
     },
 
@@ -463,14 +467,12 @@ const Components = {
             '<span class="tag tag-retired">' + safeDogGender + '</span>' +
             '</div></div>' +
             '<div class="dog-profile-actions">' +
-            '<button class="btn btn-sm" onclick="App.editDog(\'' + dog.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
-            '<button class="btn btn-sm" onclick="App.toggleForSale(\'' + dog.id + '\')">' +
-            '<i class="fas ' + (dog.forSale ? 'fa-times-circle' : 'fa-tag') + '"></i> ' +
-            (dog.forSale ? 'Remove from Sale' : 'Mark for Sale') +
-            '</button>' +
-            '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:var(--white);border:1px solid rgba(255,255,255,0.3)" onclick="App.deleteDogPrompt(\'' + dog.id + '\')">' +
-            '<i class="fas fa-trash"></i> Delete' +
-                '</button></div>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<button class="btn btn-sm" onclick="App.editDog(\'' + dog.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
+                  '<button class="btn btn-sm" onclick="App.toggleForSale(\'' + dog.id + '\')"><i class="fas ' + (dog.forSale ? 'fa-times-circle' : 'fa-tag') + '"></i> ' + (dog.forSale ? 'Remove from Sale' : 'Mark for Sale') + '</button>' +
+                  '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:var(--white);border:1px solid rgba(255,255,255,0.3)" onclick="App.deleteDogPrompt(\'' + dog.id + '\')"><i class="fas fa-trash"></i> Delete</button>'
+                : '<span style="font-size:0.8rem;color:rgba(255,255,255,0.75);padding:8px 4px"><i class="fas fa-eye"></i> View only</span>') +
+            '</div>' +
                 '</div></div>' +
                 '<div class="detail-body dog-profile-body">' +
                 '<div class="dog-profile-layout">' +
@@ -682,7 +684,7 @@ const Components = {
             '<p>Track your dogs, health plans, breeding milestones, and sales activity in one refined command center.</p>' +
             '</div>' +
             '<div class="hero-actions">' +
-            '<button class="btn btn-primary" onclick="App.showAddDog()"><i class="fas fa-plus"></i> Add Dog</button>' +
+            (role !== 'reviewer' ? '<button class="btn btn-primary" onclick="App.showAddDog()"><i class="fas fa-plus"></i> Add Dog</button>' : '') +
             '<button class="btn btn-secondary" onclick="App.navigate(\'mydogs\')"><i class="fas fa-dog"></i> View Dogs</button>' +
             '</div>' +
             '</section>' +
@@ -716,7 +718,7 @@ const Components = {
             (role === 'admin' || role === 'reviewer' ? this.statCard('fa-coins', formatCurrency(stats.totalValue), 'Total Value', 'green') : '') +
             '</div>' +
             '<div class="quick-actions">' +
-            '<button class="quick-action-btn" onclick="App.showAddDog()"><i class="fas fa-plus-circle"></i> Add New Dog</button>' +
+            (role !== 'reviewer' ? '<button class="quick-action-btn" onclick="App.showAddDog()"><i class="fas fa-plus-circle"></i> Add New Dog</button>' : '') +
             '<button class="quick-action-btn" onclick="App.navigate(\'mydogs\')"><i class="fas fa-list"></i> View All Dogs</button>' +
             '<button class="quick-action-btn" onclick="App.navigate(\'puppies\')"><i class="fas fa-paw"></i> Manage Puppies</button>' +
             '<button class="quick-action-btn" onclick="App.navigate(\'alerts\')"><i class="fas fa-bell"></i> ' + alertsBadge + ' Alerts</button>' +
@@ -964,10 +966,12 @@ const Components = {
                 var duePulseClass = isDueToday && !isMarkedDone ? ' calendar-upcoming-item-live' : '';
                 var actionHtml = '';
                 if (isDueToday && event.record && event.record.id && !isMarkedDone) {
-                    actionHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
-                        '<button class="btn btn-sm btn-secondary" onclick="App.markCalendarUpcomingDone(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.nextDue + '\')">Done</button>' +
-                        '<button class="btn btn-sm btn-secondary" onclick="App.postponeCalendarUpcoming(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.dueField + '\',\'' + event.nextDue + '\')">Postpone</button>' +
-                        '</div>';
+                    actionHtml = KennelData.getCurrentUserRole() !== 'reviewer'
+                        ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+                          '<button class="btn btn-sm btn-secondary" onclick="App.markCalendarUpcomingDone(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.nextDue + '\')">Done</button>' +
+                          '<button class="btn btn-sm btn-secondary" onclick="App.postponeCalendarUpcoming(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.dueField + '\',\'' + event.nextDue + '\')">Postpone</button>' +
+                          '</div>'
+                        : '';
                 }
                 var doneTickHtml = isMarkedDone
                     ? '<div class="calendar-task-done-indicator" title="Completed" aria-label="Task completed"><i class="fas fa-check-circle"></i></div>'
@@ -1048,8 +1052,10 @@ const Components = {
                         '<span style="color:var(--gray-500);font-size:0.9rem">' + safe(item.email || '') + ' &bull; ' + safe(item.role || 'staff') + '</span></div>' +
                         '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
                         (item.active === false ? '<span class="status-pill">Disabled</span>' : '<span class="status-pill active">Active</span>') +
-                        '<button class="btn btn-sm btn-secondary" onclick="App.toggleUserActive(\'' + item.id + '\')">' + (item.active === false ? 'Enable' : 'Disable') + '</button>' +
-                        '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
+                        (editingUserId !== item.id && KennelData.getCurrentUserRole() !== 'reviewer'
+                            ? '<button class="btn btn-sm btn-secondary" onclick="App.toggleUserActive(\'' + item.id + '\')">' + (item.active === false ? 'Enable' : 'Disable') + '</button>' +
+                              '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')"><i class="fas fa-edit"></i> Edit</button>'
+                            : '') +
                         '</div></div></div>';
                 }
             }
@@ -1099,17 +1105,19 @@ const Components = {
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3>' + pendingBadgeHtml + '</div><div class="card-body">' + pendingRows + '</div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
-            '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label>Name</label><input type="text" id="newUserName" name="newUserName" autocomplete="off" autocapitalize="none" spellcheck="false" required></div>' +
-            '<div class="form-group half"><label>Email</label><input type="email" id="newUserEmail" name="newUserEmail" autocomplete="email" required></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label>Password</label><input type="password" id="newUserPassword" name="newUserPassword" autocomplete="new-password" required></div>' +
-            '<div class="form-group half"><label>Role</label><select id="newUserRole"><option value="staff">Staff</option><option value="reviewer">Reviewer</option><option value="admin">Admin</option></select></div>' +
-            '</div>' +
-            '<button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create user</button>' +
-            '</form>' +
+            (role !== 'reviewer'
+                ? '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label>Name</label><input type="text" id="newUserName" name="newUserName" autocomplete="off" autocapitalize="none" spellcheck="false" required></div>' +
+                  '<div class="form-group half"><label>Email</label><input type="email" id="newUserEmail" name="newUserEmail" autocomplete="email" required></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label>Password</label><input type="password" id="newUserPassword" name="newUserPassword" autocomplete="new-password" required></div>' +
+                  '<div class="form-group half"><label>Role</label><select id="newUserRole"><option value="staff">Staff</option><option value="reviewer">Reviewer</option><option value="admin">Admin</option></select></div>' +
+                  '</div>' +
+                  '<button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create user</button>' +
+                  '</form>'
+                : '<p style="color:var(--gray-400);font-size:0.9rem;margin-bottom:12px"><i class="fas fa-lock"></i> Reviewers can view users but cannot create or modify accounts.</p>') +
             '<div style="margin-top:16px"><h4 style="margin-bottom:8px">Existing users</h4>' + userRows + '</div></div></div>';
 
         return '<div class="page-shell" id="pageSettings">' +
@@ -1171,7 +1179,11 @@ const Components = {
                 }
 
                 puppyCardsHtml += '<div class="card section-card">' +
-                    '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3><div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary" onclick="App.editPuppy(\'' + puppy.id + '\')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
+                    '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3>' +
+                    (KennelData.getCurrentUserRole() !== 'reviewer'
+                        ? '<div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary" onclick="App.editPuppy(\'' + puppy.id + '\')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div>'
+                        : '') +
+                    '</div>' +
                     '<div class="card-body">' +
                     '<div class="puppy-profile-sections">' +
                     '<section class="puppy-profile-section">' +
@@ -1293,7 +1305,7 @@ const Components = {
                     '<div class="finance-list-actions">' +
                     '<div class="' + amountClass + '">' + sign + ' ' + formatCurrency(entry.amount) + '</div>' +
                     (entry.type === 'sale' ? '<button class="btn btn-sm btn-secondary" onclick="App.openInvoiceModal(\'' + entry.id + '\')"><i class="fas fa-file-invoice"></i> Invoice</button>' : '') +
-                    '<button class="btn btn-sm btn-secondary" onclick="App.deleteFinanceEntry(\'' + entry.id + '\')"><i class="fas fa-trash"></i></button>' +
+                    (KennelData.getCurrentUserRole() !== 'reviewer' ? '<button class="btn btn-sm btn-secondary" onclick="App.deleteFinanceEntry(\'' + entry.id + '\')"><i class="fas fa-trash"></i></button>' : '') +
                     '</div></div>';
             }
         }
@@ -1371,16 +1383,18 @@ const Components = {
             '<div class="finance-summary-card' + marginPulseClass + '"><div class="label">Profit margin</div><div class="value">' + Number(summary.profitMargin || 0).toFixed(1) + '%</div></div>' +
             '</div>' +
             '<div class="finance-form-grid">' +
-            '<div class="card finance-form-card"><div class="card-header"><h3><i class="fas fa-plus"></i> Add transaction</h3></div><div class="card-body"><form id="financeForm" class="modern-form">' +
-            '<div class="finance-form-row"><div class="finance-form-field"><label for="financeType">Type</label><select id="financeType"><option value="sale">Sale</option><option value="expense">Expense</option></select></div>' +
-            '<div class="finance-form-field"><label for="financeDate">Date</label><input type="date" id="financeDate" value="' + new Date().toISOString().slice(0, 10) + '"></div></div>' +
-            '<div class="finance-form-row"><div class="finance-form-field full"><label for="financeTitle">Title</label><input type="text" id="financeTitle" placeholder="Puppy sale, food, transport..."></div></div>' +
-            '<div class="finance-form-row"><div class="finance-form-field"><label for="financeCategory">Category</label><input type="text" id="financeCategory" placeholder="Food, Grooming, Sale..."></div>' +
-            '<div class="finance-form-field"><label for="financeAmount">Amount</label><input type="number" id="financeAmount" min="0" step="0.01" placeholder="0.00"></div></div>' +
-            '<div class="finance-form-row"><div class="finance-form-field"><label for="financeRelated">Related dog/puppy</label><input type="text" id="financeRelated" placeholder="Name or reference"></div>' +
-            '<div class="finance-form-field"><label for="financeNotes">Notes</label><textarea id="financeNotes" rows="3" placeholder="Extra details"></textarea></div></div>' +
-            '<button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save transaction</button>' +
-            '</form></div></div>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<div class="card finance-form-card"><div class="card-header"><h3><i class="fas fa-plus"></i> Add transaction</h3></div><div class="card-body"><form id="financeForm" class="modern-form">' +
+                  '<div class="finance-form-row"><div class="finance-form-field"><label for="financeType">Type</label><select id="financeType"><option value="sale">Sale</option><option value="expense">Expense</option></select></div>' +
+                  '<div class="finance-form-field"><label for="financeDate">Date</label><input type="date" id="financeDate" value="' + new Date().toISOString().slice(0, 10) + '"></div></div>' +
+                  '<div class="finance-form-row"><div class="finance-form-field full"><label for="financeTitle">Title</label><input type="text" id="financeTitle" placeholder="Puppy sale, food, transport..."></div></div>' +
+                  '<div class="finance-form-row"><div class="finance-form-field"><label for="financeCategory">Category</label><input type="text" id="financeCategory" placeholder="Food, Grooming, Sale..."></div>' +
+                  '<div class="finance-form-field"><label for="financeAmount">Amount</label><input type="number" id="financeAmount" min="0" step="0.01" placeholder="0.00"></div></div>' +
+                  '<div class="finance-form-row"><div class="finance-form-field"><label for="financeRelated">Related dog/puppy</label><input type="text" id="financeRelated" placeholder="Name or reference"></div>' +
+                  '<div class="finance-form-field"><label for="financeNotes">Notes</label><textarea id="financeNotes" rows="3" placeholder="Extra details"></textarea></div></div>' +
+                  '<button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save transaction</button>' +
+                  '</form></div></div>'
+                : '<div class="card finance-form-card"><div class="card-body" style="color:var(--gray-400);text-align:center;padding:24px"><i class="fas fa-lock" style="font-size:1.5rem;margin-bottom:8px;display:block"></i><p>Reviewers can view but not add transactions.</p></div></div>') +
             '<div class="card finance-list-card"><div class="card-header"><h3><i class="fas fa-list"></i> Recent transactions</h3></div><div class="card-body">' + rowsHtml + '</div></div>' +
             '</div>' +
             '<div class="card section-card"><div class="card-header"><div><h3><i class="fas fa-chart-pie"></i> Monthly summaries</h3><p style="margin:4px 0 0;color:var(--gray-500)">Track profit and loss trends with printable reporting.</p></div><div class="finance-report-actions"><button class="btn btn-secondary" onclick="App.exportReport()"><i class="fas fa-file-csv"></i> Export CSV</button><button class="btn btn-primary" onclick="App.printFinanceReport()"><i class="fas fa-print"></i> Print report</button></div></div><div class="card-body">' + trendHtml + '</div></div>' +
@@ -1414,7 +1428,9 @@ const Components = {
                     (a.record.type || '') + (a.record.vet ? ' ' + a.record.vet : '') + (a.record.trainer ? ' ' + a.record.trainer : '') +
                     '</p></div>' +
                     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-                    '<button class="btn btn-sm btn-secondary" onclick="App.markAlertDone(\'' + a.dogId + '\',\'' + a.recordType + '\',\'' + a.record.id + '\',\'' + (a.nextDue || '') + '\')">Done</button>' +
+                    (KennelData.getCurrentUserRole() !== 'reviewer'
+                        ? '<button class="btn btn-sm btn-secondary" onclick="App.markAlertDone(\'' + a.dogId + '\',\'' + a.recordType + '\',\'' + a.record.id + '\',\'' + (a.nextDue || '') + '\')">Done</button>'
+                        : '') +
                     '<button class="btn btn-sm btn-primary" onclick="App.openDogDetail(\'' + a.dogId + '\')">View</button>' +
                     '</div>' +
                     '</div>';
