@@ -1141,17 +1141,19 @@ const Components = {
         var puppyStatuses = report.puppyStatuses || [];
         for (var j = 0; j < statuses.length; j++) {
             var status = statuses[j];
-            statusesHtml += '<li><strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
+            var dogNeedsAttention = status.healthStatus === 'Needs Watch' || status.groomingStatus === 'Needs Grooming';
+            statusesHtml += '<li class="' + (dogNeedsAttention ? 'report-status-alert' : '') + '">' + (dogNeedsAttention ? '<i class="fas fa-exclamation-triangle"></i> ' : '') + '<strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
         }
         for (var k = 0; k < puppyStatuses.length; k++) {
             var puppyStatus = puppyStatuses[k];
-            puppyStatusesHtml += '<li><strong>' + (puppyStatus.puppyName || 'Puppy') + '</strong> — Health: ' + (puppyStatus.healthStatus || 'N/A') + (puppyStatus.medication ? ' • Medication: ' + puppyStatus.medication : '') + '</li>';
+            var puppyNeedsAttention = puppyStatus.healthStatus === 'Needs Watch' || puppyStatus.groomingStatus === 'Needs Grooming';
+            puppyStatusesHtml += '<li class="' + (puppyNeedsAttention ? 'report-status-alert' : '') + '">' + (puppyNeedsAttention ? '<i class="fas fa-exclamation-triangle"></i> ' : '') + '<strong>' + (puppyStatus.puppyName || 'Puppy') + '</strong> — Health: ' + (puppyStatus.healthStatus || 'N/A') + (puppyStatus.groomingStatus ? ' • Grooming: ' + puppyStatus.groomingStatus : '') + (puppyStatus.medication ? ' • Medication: ' + puppyStatus.medication : '') + '</li>';
         }
         return '<h3 style="margin-bottom:14px"><i class="fas fa-calendar-day"></i> ' + (report.date ? new Date(report.date).toLocaleDateString() : 'Unknown date') + '</h3>' +
             '<div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' + (report.kennelsWashedTimes ? ' (' + report.kennelsWashedTimes + (report.kennelsWashedTimes === '1' ? ' time' : ' times') + ')' : '') : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div>' +
             '<div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div>' +
-            '<div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (statusesHtml || '<li>No dog status logged.</li>') + '</ul></div>' +
-            '<div style="margin-top:12px"><strong>Puppy health status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (puppyStatusesHtml || '<li>No puppy health status logged.</li>') + '</ul></div>';
+            '<div style="margin-top:12px"><strong>Dog status</strong><ul class="report-status-list">' + (statusesHtml || '<li>No dog status logged.</li>') + '</ul></div>' +
+            '<div style="margin-top:12px"><strong>Puppy health status</strong><ul class="report-status-list">' + (puppyStatusesHtml || '<li>No puppy health status logged.</li>') + '</ul></div>';
     },
 
     calendarPage: function() {

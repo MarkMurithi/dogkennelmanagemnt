@@ -1354,6 +1354,33 @@ body.modal-open {
     flex-shrink: 0;
 }
 
+/* Dog/puppy status lists inside the daily report detail modal — items needing
+   attention (Needs Watch health or Needs Grooming) stand out from the rest. */
+.report-status-list {
+    list-style: none;
+    margin: 8px 0 0 0;
+    padding: 0;
+    color: var(--gray-600);
+}
+
+.report-status-list li {
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+}
+
+.report-status-list li.report-status-alert {
+    background: #fff1f2;
+    border-left: 3px solid var(--danger);
+    color: var(--gray-800);
+    font-weight: 600;
+}
+
+.report-status-list li.report-status-alert i {
+    color: var(--danger);
+    margin-right: 4px;
+}
+
 
 .record-empty i { font-size: 2rem; margin-bottom: 8px; display: block; }
 .record-empty p { font-size: 0.9rem; }
