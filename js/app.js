@@ -13,6 +13,10 @@ const App = {
     navigationHistory: [],
     submissionStatusPollId: null,
     sessionWatchdogId: null,
+    chatPollId: null,
+    chatMessages: [],
+    chatLastTimestamp: '',
+    chatUnreadCount: 0,
     lastFinanceSnapshot: null,
     _settingsDataLoaded: false,
     editingUserId: null,
@@ -63,6 +67,132 @@ const App = {
                 }
             });
         }, 15000);
+    },
+
+    startChatPoll() {
+        if (this.chatPollId) { clearInterval(this.chatPollId); this.chatPollId = null; }
+        if (!KennelData.isAuthenticated()) return;
+
+        // Initial load
+        KennelData.getChatMessages().then((msgs) => {
+            this.chatMessages = msgs || [];
+            if (msgs.length) this.chatLastTimestamp = msgs[msgs.length - 1].createdAt;
+            if (this.currentPage === 'chat') this._renderChatMessages();
+            this._updateChatNavBadge();
+        });
+
+        this.chatPollId = window.setInterval(() => {
+            if (!KennelData.isAuthenticated()) { clearInterval(this.chatPollId); this.chatPollId = null; return; }
+            KennelData.getChatMessages(this.chatLastTimestamp).then((newMsgs) => {
+                if (!newMsgs || !newMsgs.length) return;
+                this.chatMessages = this.chatMessages.concat(newMsgs);
+                this.chatLastTimestamp = this.chatMessages[this.chatMessages.length - 1].createdAt;
+                if (this.currentPage === 'chat') {
+                    this._appendChatMessages(newMsgs);
+                } else {
+                    this.chatUnreadCount += newMsgs.length;
+                    this._updateChatNavBadge();
+                }
+            });
+        }, 8000);
+    },
+
+    _renderChatMessages() {
+        const container = document.getElementById('chatMessagesContainer');
+        if (!container) return;
+        const currentUser = KennelData.getCurrentUser();
+        const currentUserId = currentUser ? currentUser.id : '';
+        container.innerHTML = '';
+        if (!this.chatMessages.length) {
+            container.innerHTML = '<div class="chat-empty"><i class="fas fa-comments"></i><p>No messages yet. Send the first one!</p></div>';
+            return;
+        }
+        this.chatMessages.forEach((msg) => {
+            container.appendChild(this._buildChatBubble(msg, msg.userId === currentUserId));
+        });
+        container.scrollTop = container.scrollHeight;
+    },
+
+    _appendChatMessages(newMsgs) {
+        const container = document.getElementById('chatMessagesContainer');
+        if (!container) { this._renderChatMessages(); return; }
+        const empty = container.querySelector('.chat-empty');
+        if (empty) empty.remove();
+        const currentUser = KennelData.getCurrentUser();
+        const currentUserId = currentUser ? currentUser.id : '';
+        const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+        newMsgs.forEach((msg) => {
+            container.appendChild(this._buildChatBubble(msg, msg.userId === currentUserId));
+        });
+        if (wasAtBottom) container.scrollTop = container.scrollHeight;
+    },
+
+    _buildChatBubble(msg, isMine) {
+        const row = document.createElement('div');
+        row.className = 'chat-message-row ' + (isMine ? 'mine' : 'theirs');
+        const roleLabel = msg.userRole === 'admin' ? '<span class="chat-role-badge admin">Admin</span>' :
+                          msg.userRole === 'reviewer' ? '<span class="chat-role-badge reviewer">Reviewer</span>' :
+                          '<span class="chat-role-badge staff">Staff</span>';
+        const timeStr = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const dateStr = msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : '';
+        row.innerHTML =
+            '<div class="chat-bubble">' +
+            '<div class="chat-meta">' + (isMine ? '' : '<strong>' + Components.escapeHtml(msg.userName) + '</strong> ' + roleLabel + ' · ') + '<span class="chat-time">' + dateStr + ' ' + timeStr + '</span></div>' +
+            '<div class="chat-text">' + Components.escapeHtml(msg.content) + '</div>' +
+            '</div>';
+        return row;
+    },
+
+    _updateChatNavBadge() {
+        const navItem = document.querySelector('.nav-item[data-page="chat"]');
+        if (!navItem) return;
+        let badge = navItem.querySelector('.chat-nav-badge');
+        if (this.chatUnreadCount > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'chat-nav-badge';
+                navItem.appendChild(badge);
+            }
+            badge.textContent = this.chatUnreadCount > 9 ? '9+' : String(this.chatUnreadCount);
+        } else {
+            if (badge) badge.remove();
+        }
+    },
+
+    sendChatMessage() {
+        const input = document.getElementById('chatInput');
+        if (!input) return;
+        const content = input.value.trim();
+        if (!content) return;
+        input.value = '';
+        input.disabled = true;
+        KennelData.sendChatMessage(content).then((result) => {
+            input.disabled = false;
+            input.focus();
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to send message.', 'error');
+                input.value = content;
+                return;
+            }
+            const newMsg = result.message;
+            this.chatMessages.push(newMsg);
+            this.chatLastTimestamp = newMsg.createdAt;
+            this._appendChatMessages([newMsg]);
+        });
+    },
+
+    _setupChatInput() {
+        const input = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('chatSendBtn');
+        if (!input || !sendBtn) return;
+        sendBtn.addEventListener('click', () => this.sendChatMessage());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendChatMessage();
+            }
+        });
+        input.focus();
     },
 
     startSubmissionStatusPolling() {
@@ -946,6 +1076,10 @@ const App = {
                 clearInterval(this.sessionWatchdogId);
                 this.sessionWatchdogId = null;
             }
+            if (this.chatPollId) {
+                clearInterval(this.chatPollId);
+                this.chatPollId = null;
+            }
             if (authScreen) {
                 authScreen.innerHTML = Components.authPage();
             }
@@ -973,6 +1107,10 @@ const App = {
 
         if (!this.sessionWatchdogId) {
             this.startSessionWatchdog();
+        }
+
+        if (!this.chatPollId) {
+            this.startChatPoll();
         }
 
         if (!this.canAccessPage(this.currentPage)) {
@@ -1007,6 +1145,13 @@ const App = {
                 break;
             case 'alerts':
                 main.innerHTML = Components.alertsPage();
+                break;
+            case 'chat':
+                this.chatUnreadCount = 0;
+                this._updateChatNavBadge();
+                main.innerHTML = Components.chatPage(this.chatMessages);
+                this._renderChatMessages();
+                this._setupChatInput();
                 break;
             case 'settings':
                 main.innerHTML = Components.settingsPage();

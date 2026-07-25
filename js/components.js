@@ -1421,6 +1421,47 @@ const Components = {
             '</div></div>';
     },
 
+    chatPage: function(messages) {
+        if (messages === undefined) messages = [];
+        var currentUser = KennelData.getCurrentUser();
+        var currentUserId = currentUser ? currentUser.id : '';
+        var role = KennelData.getCurrentUserRole();
+
+        var messagesHtml = '';
+        if (!messages.length) {
+            messagesHtml = '<div class="chat-empty"><i class="fas fa-comments"></i><p>No messages yet. Send the first one!</p></div>';
+        } else {
+            for (var i = 0; i < messages.length; i++) {
+                var msg = messages[i];
+                var isMine = msg.userId === currentUserId;
+                var roleLabel = msg.userRole === 'admin' ? '<span class="chat-role-badge admin">Admin</span>' :
+                                msg.userRole === 'reviewer' ? '<span class="chat-role-badge reviewer">Reviewer</span>' :
+                                '<span class="chat-role-badge staff">Staff</span>';
+                var timeStr = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                var dateStr = msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : '';
+                messagesHtml +=
+                    '<div class="chat-message-row ' + (isMine ? 'mine' : 'theirs') + '">' +
+                    '<div class="chat-bubble">' +
+                    '<div class="chat-meta">' + (isMine ? '' : '<strong>' + this.escapeHtml(msg.userName) + '</strong> ' + roleLabel + ' · ') + '<span class="chat-time">' + dateStr + ' ' + timeStr + '</span></div>' +
+                    '<div class="chat-text">' + this.escapeHtml(msg.content) + '</div>' +
+                    '</div></div>';
+            }
+        }
+
+        return '<div class="page-shell" id="pageChat">' +
+            '<section class="page-hero">' +
+            '<div><div class="hero-badge"><i class="fas fa-comments"></i> Live Chat</div>' +
+            '<h2>Chat with ' + (role === 'admin' ? 'your team' : 'Admin') + '</h2>' +
+            '<p>' + (role === 'admin' ? 'Respond to staff and reviewer messages in real time.' : 'Send a message to the admin and get a live response.') + '</p>' +
+            '</div></section>' +
+            '<div class="chat-shell">' +
+            '<div class="chat-messages-container" id="chatMessagesContainer">' + messagesHtml + '</div>' +
+            '<div class="chat-input-bar">' +
+            '<input type="text" id="chatInput" class="chat-input" placeholder="Type a message..." maxlength="1000" autocomplete="off">' +
+            '<button class="chat-send-btn" id="chatSendBtn"><i class="fas fa-paper-plane"></i></button>' +
+            '</div></div></div>';
+    },
+
     alertsPage: function() {
         var alerts = KennelData.getAlerts();
         var contentHtml;

@@ -1089,6 +1089,27 @@ const KennelData = {
         return Boolean(this._currentUser);
     },
 
+    // ===== Chat =====
+    getChatMessages(since) {
+        var url = '/chat';
+        if (since) url += '?since=' + encodeURIComponent(since);
+        return this._request(url).then(function(result) {
+            if (result && result.ok && Array.isArray(result.messages)) {
+                return result.messages;
+            }
+            return [];
+        }).catch(function() { return []; });
+    },
+
+    sendChatMessage(content) {
+        return this._request('/chat', {
+            method: 'POST',
+            body: JSON.stringify({ content: String(content).trim() })
+        }).catch(function() {
+            return { ok: false, error: 'Unable to send message.' };
+        });
+    },
+
     // Polls /auth/me to detect if current user has been disabled by admin
     checkSessionActive() {
         if (!this._currentUser) return Promise.resolve(false);
