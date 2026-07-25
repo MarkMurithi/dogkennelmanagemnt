@@ -944,7 +944,10 @@ const Components = {
 
         return '<div class="page-shell" id="pageDailyReport">' +
             '<section class="page-hero"><div><div class="hero-badge"><i class="fas fa-file-alt"></i> Daily Operations</div><h2>Daily report</h2><p>Capture the kennel’s day-to-day care, staffing, and visitor notes in one place.</p></div></section>' +
-            '<div class="content-grid"><div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-line"></i> Daily snapshot</h3></div><div class="card-body">' + summary + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.exportDailyReports()"><i class="fas fa-download"></i> Export reports</button></div></div></div><div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportCleaningChecklist">Cleaning checklist</label><textarea id="dailyReportCleaningChecklist" rows="2" placeholder="What was cleaned or restocked?"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-group"><label for="dailyReportNotes">Notes</label><textarea id="dailyReportNotes" rows="3" placeholder="Add any extra observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><input type="text" id="dailyReportDogHealth" placeholder="Good / Needs watch"></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><input type="text" id="dailyReportDogGrooming" placeholder="Clean / Needs grooming"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div><div class="form-card"><div class="form-card-title"><i class="fas fa-paw"></i> Puppy health checklist</div><div class="form-group"><label for="dailyReportPuppySelect">Select puppy</label><select id="dailyReportPuppySelect">' + puppyOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportPuppyHealth">Health status</label><input type="text" id="dailyReportPuppyHealth" placeholder="Healthy / Needs observation"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddPuppyStatus"><i class="fas fa-plus"></i> Add puppy status</button><div id="dailyReportPuppyStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>' +
+            '<div class="content-grid"><div class="card section-card"><div class="card-header"><h3><i class="fas fa-chart-line"></i> Daily snapshot</h3></div><div class="card-body">' + summary + '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.exportDailyReports()"><i class="fas fa-download"></i> Export reports</button></div></div></div>' +
+            (KennelData.getCurrentUserRole() === 'reviewer'
+                ? '<div class="card section-card"><div class="card-body" style="text-align:center;padding:24px;color:var(--gray-400)"><i class="fas fa-lock" style="font-size:1.5rem;margin-bottom:8px;display:block"></i><p>Reviewers cannot submit daily reports.</p></div></div>'
+                : '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportCleaningChecklist">Cleaning checklist</label><textarea id="dailyReportCleaningChecklist" rows="2" placeholder="What was cleaned or restocked?"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-group"><label for="dailyReportNotes">Notes</label><textarea id="dailyReportNotes" rows="3" placeholder="Add any extra observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><input type="text" id="dailyReportDogHealth" placeholder="Good / Needs watch"></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><input type="text" id="dailyReportDogGrooming" placeholder="Clean / Needs grooming"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div><div class="form-card"><div class="form-card-title"><i class="fas fa-paw"></i> Puppy health checklist</div><div class="form-group"><label for="dailyReportPuppySelect">Select puppy</label><select id="dailyReportPuppySelect">' + puppyOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportPuppyHealth">Health status</label><input type="text" id="dailyReportPuppyHealth" placeholder="Healthy / Needs observation"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddPuppyStatus"><i class="fas fa-plus"></i> Add puppy status</button><div id="dailyReportPuppyStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>') +
             '<div class="card section-card full-width"><div class="card-header"><h3><i class="fas fa-history"></i> Previous reports</h3></div><div class="card-body">' + reportCardsHtml + '</div></div></div></div>';
     },
 
@@ -1231,53 +1234,56 @@ const Components = {
             '</section>' +
             '<div class="section-header"><h2><i class="fas fa-paw"></i> Puppies</h2><div class="section-badge"><i class="fas fa-plus-circle"></i> Add new litter</div></div>' +
             '<div class="card section-card" style="margin-bottom:24px">' +
-            '<div class="card-header"><h3 id="puppyFormTitle"><i class="fas fa-plus"></i> Add Puppy</h3></div>' +
-            '<div class="card-body">' +
-            '<form id="puppyForm" class="modern-form">' +
-            '<input type="hidden" id="puppyId" value="">' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyName">Name *</label><input type="text" id="puppyName" required></div>' +
-            '<div class="form-group half"><label for="puppyDob">Date of Birth</label><input type="date" id="puppyDob"></div>' +
+            (KennelData.getCurrentUserRole() === 'reviewer'
+                ? '<div class="card-body" style="text-align:center;padding:24px;color:var(--gray-400)"><i class="fas fa-lock" style="font-size:1.5rem;margin-bottom:8px;display:block"></i><p>Reviewers cannot add or edit puppy records.</p></div>'
+                : '<div class="card-header"><h3 id="puppyFormTitle"><i class="fas fa-plus"></i> Add Puppy</h3></div>' +
+                  '<div class="card-body">' +
+                  '<form id="puppyForm" class="modern-form">' +
+                  '<input type="hidden" id="puppyId" value="">' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyName">Name *</label><input type="text" id="puppyName" required></div>' +
+                  '<div class="form-group half"><label for="puppyDob">Date of Birth</label><input type="date" id="puppyDob"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyGender">Gender *</label><select id="puppyGender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>' +
+                  '<div class="form-group half"><label for="puppySaleStatus">Sale Status</label><select id="puppySaleStatus"><option value="Available">Available</option><option value="Booked">Booked</option><option value="Sold">Sold</option></select></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyCollarColor">Collar Colour</label><input type="text" id="puppyCollarColor" placeholder="e.g. Red"></div>' +
+                  '</div>' +
+                  '<div class="form-row" id="puppySaleAmountFields" style="display:none">' +
+                  '<div class="form-group half"><label for="puppyTotalSaleAmount">Total Sale Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyTotalSaleAmount" placeholder="250000"></div>' +
+                  '<div class="form-group half"><label for="puppyReceivedAmount">Received Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyReceivedAmount" placeholder="100000"></div>' +
+                  '<div class="form-group half"><label for="puppyUnpaidAmount">Unpaid Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyUnpaidAmount" placeholder="150000"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyVaccinationDate">Vaccination Date</label><input type="date" id="puppyVaccinationDate"></div>' +
+                  '<div class="form-group half"><label for="puppyNextVaccination">Next Vaccination</label><input type="date" id="puppyNextVaccination"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyDewormingDate">Deworming Date</label><input type="date" id="puppyDewormingDate"></div>' +
+                  '<div class="form-group half"><label for="puppyNextDeworming">Next Deworming</label><input type="date" id="puppyNextDeworming"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyFather">Father</label><input type="text" id="puppyFather" placeholder="Father"></div>' +
+                  '<div class="form-group half"><label for="puppyMother">Mother</label><input type="text" id="puppyMother" placeholder="Mother"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppySireGrandfather">Sire\'s Father</label><input type="text" id="puppySireGrandfather" placeholder="Sire\'s father"></div>' +
+                  '<div class="form-group half"><label for="puppySireGrandmother">Sire\'s Mother</label><input type="text" id="puppySireGrandmother" placeholder="Sire\'s mother"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyDamGrandfather">Dam\'s Father</label><input type="text" id="puppyDamGrandfather" placeholder="Dam\'s father"></div>' +
+                  '<div class="form-group half"><label for="puppyDamGrandmother">Dam\'s Mother</label><input type="text" id="puppyDamGrandmother" placeholder="Dam\'s mother"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
+                  '<div class="form-group half"><label for="puppyOwnerName">Owner Name</label><input type="text" id="puppyOwnerName" placeholder="Owner name"></div>' +
+                  '<div class="form-group half"><label for="puppyOwnerPhone">Phone Number</label><input type="tel" id="puppyOwnerPhone" placeholder="Phone number"></div>' +
+                  '</div>' +
+                  '<div class="form-group"><label for="puppyOwnerAddress">Address</label><input type="text" id="puppyOwnerAddress" placeholder="Owner address"></div>' +
+                  '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="puppySubmitBtn" type="submit"><i class="fas fa-plus"></i> Add Puppy</button><button class="btn btn-secondary" id="puppyCancelEditBtn" type="button" style="display:none"><i class="fas fa-times"></i> Cancel Edit</button></div>' +
+                  '</form></div>') +
             '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyGender">Gender *</label><select id="puppyGender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>' +
-            '<div class="form-group half"><label for="puppySaleStatus">Sale Status</label><select id="puppySaleStatus"><option value="Available">Available</option><option value="Booked">Booked</option><option value="Sold">Sold</option></select></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyCollarColor">Collar Colour</label><input type="text" id="puppyCollarColor" placeholder="e.g. Red"></div>' +
-            '</div>' +
-            '<div class="form-row" id="puppySaleAmountFields" style="display:none">' +
-            '<div class="form-group half"><label for="puppyTotalSaleAmount">Total Sale Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyTotalSaleAmount" placeholder="250000"></div>' +
-            '<div class="form-group half"><label for="puppyReceivedAmount">Received Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyReceivedAmount" placeholder="100000"></div>' +
-            '<div class="form-group half"><label for="puppyUnpaidAmount">Unpaid Amount (KSh)</label><input type="number" step="0.01" min="0" id="puppyUnpaidAmount" placeholder="150000"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyVaccinationDate">Vaccination Date</label><input type="date" id="puppyVaccinationDate"></div>' +
-            '<div class="form-group half"><label for="puppyNextVaccination">Next Vaccination</label><input type="date" id="puppyNextVaccination"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyDewormingDate">Deworming Date</label><input type="date" id="puppyDewormingDate"></div>' +
-            '<div class="form-group half"><label for="puppyNextDeworming">Next Deworming</label><input type="date" id="puppyNextDeworming"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyFather">Father</label><input type="text" id="puppyFather" placeholder="Father"></div>' +
-            '<div class="form-group half"><label for="puppyMother">Mother</label><input type="text" id="puppyMother" placeholder="Mother"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppySireGrandfather">Sire\'s Father</label><input type="text" id="puppySireGrandfather" placeholder="Sire\'s father"></div>' +
-            '<div class="form-group half"><label for="puppySireGrandmother">Sire\'s Mother</label><input type="text" id="puppySireGrandmother" placeholder="Sire\'s mother"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyDamGrandfather">Dam\'s Father</label><input type="text" id="puppyDamGrandfather" placeholder="Dam\'s father"></div>' +
-            '<div class="form-group half"><label for="puppyDamGrandmother">Dam\'s Mother</label><input type="text" id="puppyDamGrandmother" placeholder="Dam\'s mother"></div>' +
-            '</div>' +
-            '<div class="form-row">' +
-            '<div class="form-group half"><label for="puppyOwnerName">Owner Name</label><input type="text" id="puppyOwnerName" placeholder="Owner name"></div>' +
-            '<div class="form-group half"><label for="puppyOwnerPhone">Phone Number</label><input type="tel" id="puppyOwnerPhone" placeholder="Phone number"></div>' +
-            '</div>' +
-            '<div class="form-group"><label for="puppyOwnerAddress">Address</label><input type="text" id="puppyOwnerAddress" placeholder="Owner address"></div>' +
-            '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="puppySubmitBtn" type="submit"><i class="fas fa-plus"></i> Add Puppy</button><button class="btn btn-secondary" id="puppyCancelEditBtn" type="button" style="display:none"><i class="fas fa-times"></i> Cancel Edit</button></div>' +
-            '</form></div></div>' +
             '<div class="section-header"><h2><i class="fas fa-list"></i> Puppy Records</h2></div>' +
             '<div class="content-grid">' + puppyCardsHtml + '</div></div>';
     },
