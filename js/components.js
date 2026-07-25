@@ -497,163 +497,86 @@ const Components = {
     },
 
     kennelCarousel: function(dogs, stats) {
-        var personalisedSlides = [];
         var safe = this.escapeHtml.bind(this);
-        
-        // ---- Daily briefing slide from previous day's report ----
-        var briefingSlide = null;
         var reports = KennelData.getDailyReports();
-        if (reports && reports.length > 0) {
-            var lastReport = reports[0];
-            var reportDate = new Date(lastReport.date);
-            var today = new Date();
-            var yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            
-            var isYesterday = reportDate.toDateString() === yesterday.toDateString();
-            
-            if (isYesterday || reportDate.toDateString() === today.toDateString()) {
-                var dogCount = (lastReport.dogStatuses || []).length;
-                var puppyCount = (lastReport.puppyStatuses || []).length;
-                var healthSummary = '';
-                var healthStatuses = {};
-                
-                if (lastReport.dogStatuses) {
-                    for (var dsi = 0; dsi < lastReport.dogStatuses.length; dsi++) {
-                        var ds = lastReport.dogStatuses[dsi];
-                        healthStatuses[ds.healthStatus] = (healthStatuses[ds.healthStatus] || 0) + 1;
-                    }
+        var reportImg = 'https://images.unsplash.com/photo-1453227427063-ff1c26b89d53?w=960&h=420&fit=crop&crop=center';
+        var maxSlides = 7;
+        var allSlides = [];
+
+        var today = new Date();
+        var yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        for (var ri = 0; ri < reports.length && allSlides.length < maxSlides; ri++) {
+            var report = reports[ri];
+            var reportDate = new Date(report.date);
+            var dogStatuses = report.dogStatuses || [];
+            var puppyStatuses = report.puppyStatuses || [];
+            var dogCount = dogStatuses.length;
+            var puppyCount = puppyStatuses.length;
+
+            var healthStatuses = {};
+            for (var dsi = 0; dsi < dogStatuses.length; dsi++) {
+                var hs = dogStatuses[dsi].healthStatus || 'Unknown';
+                healthStatuses[hs] = (healthStatuses[hs] || 0) + 1;
+            }
+            var healthKeys = Object.keys(healthStatuses);
+            var healthSummary = healthKeys.map(function(k) { return healthStatuses[k] + ' ' + k; }).join(' • ');
+
+            var puppyHealthStatuses = {};
+            for (var psi = 0; psi < puppyStatuses.length; psi++) {
+                var phs = puppyStatuses[psi].healthStatus || 'Unknown';
+                puppyHealthStatuses[phs] = (puppyHealthStatuses[phs] || 0) + 1;
+            }
+            var puppyHealthKeys = Object.keys(puppyHealthStatuses);
+            var puppyHealthSummary = puppyHealthKeys.map(function(k) { return puppyHealthStatuses[k] + ' ' + k; }).join(' • ');
+
+            var kennelStatus = report.kennelsWashed
+                ? ('✓ Cleaned' + (report.kennelsWashedTimes ? ' (' + report.kennelsWashedTimes + (report.kennelsWashedTimes === '1' ? ' time' : ' times') + ')' : ''))
+                : '○ Not cleaned';
+
+            var concernPattern = /sick|injur|poor|unwell|ill|concern/i;
+            var hasConcern = concernPattern.test(healthSummary) || concernPattern.test(puppyHealthSummary);
+
+            var dateLabel = reportDate.toDateString() === today.toDateString() ? 'Today'
+                : reportDate.toDateString() === yesterday.toDateString() ? 'Yesterday'
+                : reportDate.toLocaleDateString();
+
+            var gradient = hasConcern
+                ? 'linear-gradient(135deg,rgba(90,20,20,0.8),rgba(150,40,40,0.6))'
+                : 'linear-gradient(135deg,rgba(20,50,80,0.78),rgba(10,80,120,0.58))';
+
+            var slideTitle = safe(reportDate.toLocaleDateString()) + ' – ' + dogCount + ' dogs, ' + puppyCount + ' puppies';
+            var slideSub = 'Kennels: ' + kennelStatus + ' • Food: ' + safe(report.foodRemaining || 'N/A') + ' remaining' + (report.visitors ? ' • Visitors: ' + safe(report.visitors) : ' • No visitors');
+
+            allSlides.push({
+                img: reportImg,
+                gradient: gradient,
+                badge: dateLabel + ' Report',
+                icon: hasConcern ? 'fa-exclamation-triangle' : 'fa-clipboard-list',
+                title: slideTitle,
+                sub: slideSub,
+                isReportSlide: true,
+                reportData: {
+                    foodToday: report.foodToday || 'N/A',
+                    personInCharge: report.personInCharge || 'N/A',
+                    healthSummary: healthSummary,
+                    puppyHealthSummary: puppyHealthSummary
                 }
-                
-                var statusKeys = Object.keys(healthStatuses);
-                if (statusKeys.length > 0) {
-                    healthSummary = statusKeys.map(function(k) { return healthStatuses[k] + ' ' + k; }).join(' • ');
-                }
-                
-                var kennelStatus = lastReport.kennelsWashed ? '✓ Cleaned' : '○ Not cleaned';
-                if (lastReport.kennelsWashedTimes) {
-                    kennelStatus = '✓ Cleaned (' + lastReport.kennelsWashedTimes + 'x)';
-                }
-                
-                var briefTitle = safe(new Date(lastReport.date).toLocaleDateString()) + ' – ' + dogCount + ' dogs, ' + puppyCount + ' puppies';
-                var briefSub = 'Kennels: ' + kennelStatus + ' • Food: ' + (lastReport.foodRemaining || 'N/A') + ' remaining • ' + (lastReport.visitors ? 'Visitors: ' + lastReport.visitors : 'No visitors');
-                
-                briefingSlide = {
-                    img: 'https://images.unsplash.com/photo-1453227427063-ff1c26b89d53?w=960&h=420&fit=crop&crop=center',
-                    gradient: 'linear-gradient(135deg,rgba(20,50,80,0.78),rgba(10,80,120,0.58))',
-                    badge: 'Daily Briefing',
-                    icon: 'fa-clipboard-list',
-                    title: briefTitle,
-                    sub: briefSub,
-                    isReportSlide: true,
-                    reportData: {
-                        date: lastReport.date,
-                        dogCount: dogCount,
-                        puppyCount: puppyCount,
-                        kennelStatus: kennelStatus,
-                        healthSummary: healthSummary,
-                        foodToday: lastReport.foodToday || 'N/A',
-                        personInCharge: lastReport.personInCharge || 'N/A'
-                    }
-                };
-            }
+            });
         }
 
-        // ---- German Shepherd lifestyle slides (always shown) ----
-        var genericSlides = [
-            {
-                img: 'https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=960&h=420&fit=crop&crop=center',
-                gradient: 'linear-gradient(135deg,rgba(30,30,30,0.72),rgba(80,60,20,0.55))',
-                badge: 'Training',
-                icon: 'fa-graduation-cap',
-                title: 'Discipline builds champions',
-                sub: 'German Shepherds trained to peak performance'
-            },
-            {
-                img: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=960&h=420&fit=crop&crop=center',
-                gradient: 'linear-gradient(135deg,rgba(10,40,20,0.72),rgba(20,80,40,0.55))',
-                badge: 'Security Work',
-                icon: 'fa-shield-alt',
-                title: 'Protecting what matters most',
-                sub: 'German Shepherds on patrol — loyal & vigilant'
-            },
-            {
-                img: 'https://images.unsplash.com/photo-1558945506-a7cd4bbd94d1?w=960&h=420&fit=crop&crop=center',
-                gradient: 'linear-gradient(135deg,rgba(40,20,60,0.72),rgba(80,40,120,0.55))',
-                badge: 'Puppy Care',
-                icon: 'fa-paw',
-                title: 'Raising tomorrow\'s elite',
-                sub: 'German Shepherd puppies from premium bloodlines'
-            },
-            {
-                img: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=960&h=420&fit=crop&crop=center',
-                gradient: 'linear-gradient(135deg,rgba(60,20,20,0.72),rgba(120,40,40,0.55))',
-                badge: 'Health & Wellness',
-                icon: 'fa-heartbeat',
-                title: 'Health is the foundation',
-                sub: 'Vet-approved nutrition & care for our Shepherds'
-            },
-            {
-                img: 'https://images.unsplash.com/photo-1558985212-4b5c56011651?w=960&h=420&fit=crop&crop=center',
-                gradient: 'linear-gradient(135deg,rgba(20,30,60,0.72),rgba(40,60,120,0.55))',
-                badge: 'Premium Feeding',
-                icon: 'fa-bone',
-                title: 'Fuelled for excellence',
-                sub: 'High-protein nutrition for German Shepherd strength'
-            }
-        ];
-
-        // ---- Personalised slides from actual dogs ----
-        // Add briefing slide first if it exists
-        if (briefingSlide) {
-            personalisedSlides.push(briefingSlide);
+        if (allSlides.length === 0) {
+            allSlides.push({
+                img: reportImg,
+                gradient: 'linear-gradient(135deg,rgba(40,40,40,0.8),rgba(80,80,80,0.6))',
+                badge: 'No Reports Yet',
+                icon: 'fa-clipboard-list',
+                title: 'No daily reports submitted',
+                sub: 'Submit a daily report to see kennel condition here',
+                isReportSlide: false
+            });
         }
-
-        // Upcoming events → personalised slide per dog (max 3 after briefing)
-        var seenDogs = {};
-        var maxEventSlides = briefingSlide ? 3 : 4;
-        if (stats && stats.upcomingEvents) {
-            for (var ei = 0; ei < stats.upcomingEvents.length && personalisedSlides.length < (maxEventSlides + (briefingSlide ? 1 : 0)); ei++) {
-                var ev = stats.upcomingEvents[ei];
-                if (seenDogs[ev.dogId]) continue;
-                seenDogs[ev.dogId] = true;
-                var daysUntil = Math.round((new Date(ev.nextDue) - new Date()) / (1000 * 60 * 60 * 24));
-                var daysLabel = daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : 'in ' + daysUntil + ' days';
-                var evBadge = ev.type.charAt(0).toUpperCase() + ev.type.slice(1);
-                var evIcon = { health: 'fa-heartbeat', vaccination: 'fa-syringe', deworming: 'fa-bug', breeding: 'fa-dna', training: 'fa-graduation-cap', heatCycle: 'fa-thermometer-half' }[ev.type] || 'fa-calendar-alt';
-                var evColor = { health: 'linear-gradient(135deg,rgba(10,60,40,0.78),rgba(20,100,60,0.55))', vaccination: 'linear-gradient(135deg,rgba(30,50,100,0.78),rgba(50,80,160,0.55))', deworming: 'linear-gradient(135deg,rgba(80,60,10,0.78),rgba(140,100,20,0.55))', training: 'linear-gradient(135deg,rgba(50,20,80,0.78),rgba(90,40,140,0.55))', breeding: 'linear-gradient(135deg,rgba(80,20,40,0.78),rgba(150,40,80,0.55))', heatCycle: 'linear-gradient(135deg,rgba(80,30,30,0.78),rgba(160,60,60,0.55))' }[ev.type] || 'linear-gradient(135deg,rgba(30,30,30,0.78),rgba(80,60,20,0.55))';
-                var evTitle = safe(ev.dogName) + ' — ' + evBadge + ' due ' + daysLabel;
-                var evSub = (ev.record && ev.record.type) ? safe(ev.record.type) : 'Care scheduled';
-                personalisedSlides.push({
-                    img: genericSlides[(personalisedSlides.length - (briefingSlide ? 1 : 0)) % genericSlides.length].img,
-                    gradient: evColor,
-                    badge: evBadge,
-                    icon: evIcon,
-                    title: evTitle,
-                    sub: evSub,
-                    dogId: ev.dogId
-                });
-            }
-        }
-
-        // Recent activity slides (if no upcoming events personalisation, use recent activity)
-        if (personalisedSlides.length === (briefingSlide ? 1 : 0)) {
-            var activities = KennelData.getActivities(3);
-            for (var ai = 0; ai < activities.length; ai++) {
-                var act = activities[ai];
-                personalisedSlides.push({
-                    img: genericSlides[(briefingSlide ? 1 : 0) + ai % genericSlides.length].img,
-                    gradient: genericSlides[ai % genericSlides.length].gradient,
-                    badge: 'Recent Activity',
-                    icon: 'fa-history',
-                    title: act.text.replace(/<[^>]+>/g, ''),
-                    sub: this.timeAgo(act.time)
-                });
-            }
-        }
-
-        // Merge: personalised first (including briefing), then generic (total max 7)
-        var allSlides = personalisedSlides.concat(genericSlides).slice(0, 7);
 
         var slidesHtml = '';
         var dotsHtml = '';
@@ -661,20 +584,20 @@ const Components = {
             var sl = allSlides[si];
             var isActive = si === 0;
             var slideClass = 'kc-slide' + (isActive ? ' active' : '') + (sl.isReportSlide ? ' kc-slide-report' : '');
-            var slideClickAttr = sl.dogId ? ' onclick="App.openDogDetail(\'' + sl.dogId + '\')" style="cursor:pointer"' : '';
             slidesHtml +=
-                '<div class="' + slideClass + '" data-index="' + si + '"' + slideClickAttr + '>' +
+                '<div class="' + slideClass + '" data-index="' + si + '">' +
                 '<div class="kc-slide-bg" style="background:' + sl.gradient + '"></div>' +
                 '<img class="kc-slide-img" src="' + sl.img + '" alt="" loading="lazy" onerror="this.style.opacity=\'0\'">' +
                 '<div class="kc-slide-content">' +
                 '<div class="kc-slide-badge"><i class="fas ' + sl.icon + '"></i> ' + sl.badge + '</div>' +
                 '<h3 class="kc-slide-title">' + sl.title + '</h3>' +
                 '<p class="kc-slide-sub">' + sl.sub + '</p>' +
-                (sl.isReportSlide && sl.reportData ? 
+                (sl.isReportSlide && sl.reportData ?
                     '<div class="kc-report-details">' +
                     '<div class="kc-report-stat"><strong>Food today:</strong> ' + safe(sl.reportData.foodToday) + '</div>' +
                     '<div class="kc-report-stat"><strong>Staff:</strong> ' + safe(sl.reportData.personInCharge) + '</div>' +
-                    (sl.reportData.healthSummary ? '<div class="kc-report-stat"><strong>Health:</strong> ' + safe(sl.reportData.healthSummary) + '</div>' : '') +
+                    (sl.reportData.healthSummary ? '<div class="kc-report-stat"><strong>Dog health:</strong> ' + safe(sl.reportData.healthSummary) + '</div>' : '') +
+                    (sl.reportData.puppyHealthSummary ? '<div class="kc-report-stat"><strong>Puppy health:</strong> ' + safe(sl.reportData.puppyHealthSummary) + '</div>' : '') +
                     '</div>' : '') +
                 '</div></div>';
             dotsHtml += '<button class="kc-dot' + (isActive ? ' active' : '') + '" data-dot="' + si + '" aria-label="Slide ' + (si + 1) + '"></button>';
