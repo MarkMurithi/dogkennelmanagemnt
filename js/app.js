@@ -1033,6 +1033,62 @@ const App = {
         });
     },
 
+    initKennelCarousel() {
+        if (this.currentPage !== 'overview') return;
+        const carousel = document.getElementById('kennelCarousel');
+        if (!carousel) return;
+
+        const slides = carousel.querySelectorAll('.kc-slide');
+        const dots = carousel.querySelectorAll('.kc-dot');
+        if (!slides.length) return;
+
+        let current = 0;
+        let autoId = null;
+
+        const goTo = (idx) => {
+            slides[current].classList.remove('active');
+            dots[current] && dots[current].classList.remove('active');
+            current = (idx + slides.length) % slides.length;
+            slides[current].classList.add('active');
+            dots[current] && dots[current].classList.add('active');
+        };
+
+        const next = () => goTo(current + 1);
+        const prev = () => goTo(current - 1);
+
+        const startAuto = () => {
+            stopAuto();
+            autoId = window.setInterval(next, 5000);
+        };
+
+        const stopAuto = () => {
+            if (autoId) { clearInterval(autoId); autoId = null; }
+        };
+
+        const kcNext = document.getElementById('kcNext');
+        const kcPrev = document.getElementById('kcPrev');
+        if (kcNext) kcNext.addEventListener('click', () => { next(); startAuto(); });
+        if (kcPrev) kcPrev.addEventListener('click', () => { prev(); startAuto(); });
+
+        dots.forEach((dot) => {
+            dot.addEventListener('click', () => { goTo(Number(dot.dataset.dot)); startAuto(); });
+        });
+
+        // Touch/swipe support
+        let touchStartX = 0;
+        carousel.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; }, { passive: true });
+        carousel.addEventListener('touchend', (e) => {
+            const diff = touchStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 40) { diff > 0 ? next() : prev(); startAuto(); }
+        }, { passive: true });
+
+        // Pause on hover
+        carousel.addEventListener('mouseenter', stopAuto);
+        carousel.addEventListener('mouseleave', startAuto);
+
+        startAuto();
+    },
+
     getFinancePulseState() {
         const summary = KennelData.getFinanceSummary() || {};
         const snapshot = {
@@ -1164,6 +1220,7 @@ const App = {
         }
         this.setupPageInteractions();
         this.animateOverviewCounters();
+        this.initKennelCarousel();
 
         // Update badge
         const badge = document.getElementById('totalDogsBadge');

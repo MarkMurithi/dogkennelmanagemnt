@@ -496,6 +496,125 @@ const Components = {
                 '</div></div></div></div></div>';
     },
 
+    kennelCarousel: function(dogs, stats) {
+        // ---- Generic lifestyle slides (always shown) ----
+        var genericSlides = [
+            {
+                img: 'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=960&h=420&fit=crop&crop=center',
+                gradient: 'linear-gradient(135deg,rgba(30,30,30,0.72),rgba(80,60,20,0.55))',
+                badge: 'Training',
+                icon: 'fa-graduation-cap',
+                title: 'Discipline builds champions',
+                sub: 'Daily training keeps every dog sharp, focused, and ready'
+            },
+            {
+                img: 'https://images.unsplash.com/photo-1583511655826-05700d52f4d9?w=960&h=420&fit=crop&crop=center',
+                gradient: 'linear-gradient(135deg,rgba(10,40,20,0.72),rgba(20,80,40,0.55))',
+                badge: 'Security Patrol',
+                icon: 'fa-shield-alt',
+                title: 'Protecting what matters most',
+                sub: 'German Shepherds on active duty — loyal, vigilant, unstoppable'
+            },
+            {
+                img: 'https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=960&h=420&fit=crop&crop=center',
+                gradient: 'linear-gradient(135deg,rgba(40,20,60,0.72),rgba(80,40,120,0.55))',
+                badge: 'Puppy Care',
+                icon: 'fa-paw',
+                title: 'Raising tomorrow\'s elite',
+                sub: 'Every litter is the beginning of an extraordinary K9 journey'
+            },
+            {
+                img: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=960&h=420&fit=crop&crop=center',
+                gradient: 'linear-gradient(135deg,rgba(60,20,20,0.72),rgba(120,40,40,0.55))',
+                badge: 'Health & Wellness',
+                icon: 'fa-heartbeat',
+                title: 'Health is the foundation',
+                sub: 'Regular vet checks, nutrition, and care keep the pack thriving'
+            },
+            {
+                img: 'https://images.unsplash.com/photo-1534361960057-19f4434a337d?w=960&h=420&fit=crop&crop=center',
+                gradient: 'linear-gradient(135deg,rgba(20,30,60,0.72),rgba(40,60,120,0.55))',
+                badge: 'Feeding Time',
+                icon: 'fa-bone',
+                title: 'Fuelled for excellence',
+                sub: 'Balanced nutrition powers peak performance every day'
+            }
+        ];
+
+        // ---- Personalised slides from actual dogs ----
+        var personalisedSlides = [];
+        var safe = this.escapeHtml.bind(this);
+
+        // Upcoming events → personalised slide per dog (max 4)
+        var seenDogs = {};
+        if (stats && stats.upcomingEvents) {
+            for (var ei = 0; ei < stats.upcomingEvents.length && personalisedSlides.length < 4; ei++) {
+                var ev = stats.upcomingEvents[ei];
+                if (seenDogs[ev.dogId]) continue;
+                seenDogs[ev.dogId] = true;
+                var daysUntil = Math.round((new Date(ev.nextDue) - new Date()) / (1000 * 60 * 60 * 24));
+                var daysLabel = daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : 'in ' + daysUntil + ' days';
+                var evBadge = ev.type.charAt(0).toUpperCase() + ev.type.slice(1);
+                var evIcon = { health: 'fa-heartbeat', vaccination: 'fa-syringe', deworming: 'fa-bug', breeding: 'fa-dna', training: 'fa-graduation-cap', heatCycle: 'fa-thermometer-half' }[ev.type] || 'fa-calendar-alt';
+                var evColor = { health: 'linear-gradient(135deg,rgba(10,60,40,0.78),rgba(20,100,60,0.55))', vaccination: 'linear-gradient(135deg,rgba(30,50,100,0.78),rgba(50,80,160,0.55))', deworming: 'linear-gradient(135deg,rgba(80,60,10,0.78),rgba(140,100,20,0.55))', training: 'linear-gradient(135deg,rgba(50,20,80,0.78),rgba(90,40,140,0.55))', breeding: 'linear-gradient(135deg,rgba(80,20,40,0.78),rgba(150,40,80,0.55))', heatCycle: 'linear-gradient(135deg,rgba(80,30,30,0.78),rgba(160,60,60,0.55))' }[ev.type] || 'linear-gradient(135deg,rgba(30,30,30,0.78),rgba(80,60,20,0.55))';
+                var evTitle = safe(ev.dogName) + ' — ' + evBadge + ' due ' + daysLabel;
+                var evSub = (ev.record && ev.record.type) ? safe(ev.record.type) : 'Care scheduled';
+                personalisedSlides.push({
+                    img: genericSlides[personalisedSlides.length % genericSlides.length].img,
+                    gradient: evColor,
+                    badge: evBadge,
+                    icon: evIcon,
+                    title: evTitle,
+                    sub: evSub,
+                    dogId: ev.dogId
+                });
+            }
+        }
+
+        // Recent activity slides (if no upcoming events personalisation, use recent activity)
+        if (personalisedSlides.length === 0) {
+            var activities = KennelData.getActivities(3);
+            for (var ai = 0; ai < activities.length; ai++) {
+                var act = activities[ai];
+                personalisedSlides.push({
+                    img: genericSlides[ai % genericSlides.length].img,
+                    gradient: genericSlides[ai % genericSlides.length].gradient,
+                    badge: 'Recent Activity',
+                    icon: 'fa-history',
+                    title: act.text.replace(/<[^>]+>/g, ''),
+                    sub: this.timeAgo(act.time)
+                });
+            }
+        }
+
+        // Merge: personalised first, then generic (total max 7)
+        var allSlides = personalisedSlides.concat(genericSlides).slice(0, 7);
+
+        var slidesHtml = '';
+        var dotsHtml = '';
+        for (var si = 0; si < allSlides.length; si++) {
+            var sl = allSlides[si];
+            var isActive = si === 0;
+            slidesHtml +=
+                '<div class="kc-slide' + (isActive ? ' active' : '') + '" data-index="' + si + '"' + (sl.dogId ? ' onclick="App.openDogDetail(\'' + sl.dogId + '\')" style="cursor:pointer"' : '') + '>' +
+                '<div class="kc-slide-bg" style="background:' + sl.gradient + '"></div>' +
+                '<img class="kc-slide-img" src="' + sl.img + '" alt="" loading="lazy" onerror="this.style.opacity=\'0\'">' +
+                '<div class="kc-slide-content">' +
+                '<div class="kc-slide-badge"><i class="fas ' + sl.icon + '"></i> ' + sl.badge + '</div>' +
+                '<h3 class="kc-slide-title">' + sl.title + '</h3>' +
+                '<p class="kc-slide-sub">' + sl.sub + '</p>' +
+                '</div></div>';
+            dotsHtml += '<button class="kc-dot' + (isActive ? ' active' : '') + '" data-dot="' + si + '" aria-label="Slide ' + (si + 1) + '"></button>';
+        }
+
+        return '<div class="kennel-carousel" id="kennelCarousel">' +
+            '<div class="kc-track">' + slidesHtml + '</div>' +
+            '<button class="kc-btn kc-prev" id="kcPrev" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>' +
+            '<button class="kc-btn kc-next" id="kcNext" aria-label="Next"><i class="fas fa-chevron-right"></i></button>' +
+            '<div class="kc-dots" id="kcDots">' + dotsHtml + '</div>' +
+            '</div>';
+    },
+
     overviewPage: function() {
         function formatCurrency(value) {
             return 'KSh ' + Number(value || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -689,6 +808,7 @@ const Components = {
             '<button class="btn btn-secondary" onclick="App.navigate(\'mydogs\')"><i class="fas fa-dog"></i> View Dogs</button>' +
             '</div>' +
             '</section>' +
+            this.kennelCarousel(dogs, stats) +
             '<div class="overview-spotlight-card ' + spotlightTone + '">' +
             '<div>' +
             '<div class="hero-badge"><i class="fas fa-sparkles"></i> Live pulse</div>' +
