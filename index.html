@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bigpaw Kennel - Dog Kennel Management</title>
-    <link rel="stylesheet" href="css/style.css?v=20260723">
+    <link rel="stylesheet" href="css/style.css?v=20260725">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
@@ -229,6 +229,22 @@
         </div>
     </div>
 
+    <!-- Daily Report Detail Modal -->
+    <div class="modal-overlay" id="dailyReportDetailModal">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <h2>Daily Report</h2>
+                <button class="modal-close" id="dailyReportDetailModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="dailyReportDetailBody"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="dailyReportDetailModalCancel">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div class="modal-overlay" id="deleteModal">
         <div class="modal modal-sm">
@@ -246,8 +262,8 @@
         </div>
     </div>
 
-    <script src="js/data.js?v=20260723"></script>
-    <script src="js/components.js?v=20260723"></script>
-    <script src="js/app.js?v=20260723"></script>
+    <script src="js/data.js?v=20260725"></script>
+    <script src="js/components.js?v=20260725"></script>
+    <script src="js/app.js?v=20260725"></script>
 </body>
 </html>

@@ -1106,22 +1106,21 @@ const Components = {
             summary = '<p style="color:var(--gray-400)">No daily reports yet.</p>';
         } else {
             summary = '<div class="detail-info-grid"><div class="detail-info-item"><label>Latest report</label><p>' + new Date(reports[0].date).toLocaleDateString() + '</p></div><div class="detail-info-item"><label>Reports logged</label><p>' + reports.length + '</p></div><div class="detail-info-item"><label>Most recent staff</label><p>' + (reports[0].personInCharge || 'N/A') + '</p></div></div>';
+            var todayStr = this.formatDateYMD(new Date());
+            var tilesHtml = '';
             for (var i = 0; i < reports.length; i++) {
                 var report = reports[i];
-                var statusesHtml = '';
-                var statuses = report.dogStatuses || [];
-                var puppyStatusesHtml = '';
-                var puppyStatuses = report.puppyStatuses || [];
-                for (var j = 0; j < statuses.length; j++) {
-                    var status = statuses[j];
-                    statusesHtml += '<li><strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
-                }
-                for (var k = 0; k < puppyStatuses.length; k++) {
-                    var puppyStatus = puppyStatuses[k];
-                    puppyStatusesHtml += '<li><strong>' + (puppyStatus.puppyName || 'Puppy') + '</strong> — Health: ' + (puppyStatus.healthStatus || 'N/A') + (puppyStatus.medication ? ' • Medication: ' + puppyStatus.medication : '') + '</li>';
-                }
-                reportCardsHtml += '<div class="card section-card" style="margin-bottom:12px"><div class="card-header"><h3><i class="fas fa-calendar-day"></i> ' + new Date(report.date).toLocaleDateString() + '</h3></div><div class="card-body"><div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' + (report.kennelsWashedTimes ? ' (' + report.kennelsWashedTimes + (report.kennelsWashedTimes === '1' ? ' time' : ' times') + ')' : '') : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div><div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div><div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (statusesHtml || '<li>No dog status logged.</li>') + '</ul></div><div style="margin-top:12px"><strong>Puppy health status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (puppyStatusesHtml || '<li>No puppy health status logged.</li>') + '</ul></div></div></div>';
+                var isToday = report.date === todayStr;
+                var formattedDate = report.date ? new Date(report.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown date';
+                var tileTitle = isToday ? "Today's Report" : (formattedDate + ' Report');
+                var tileMeta = isToday ? formattedDate : (report.personInCharge ? ('By ' + this.escapeHtml(report.personInCharge)) : 'Tap to view');
+                tilesHtml += '<button type="button" class="daily-report-tile' + (isToday ? ' is-today' : '') + '" onclick="App.openDailyReportDetail(\'' + report.id + '\')">' +
+                    '<div class="daily-report-tile-icon"><i class="fas fa-calendar-day"></i></div>' +
+                    '<div class="daily-report-tile-text"><h4>' + tileTitle + '</h4><p>' + tileMeta + '</p></div>' +
+                    '<i class="fas fa-chevron-right daily-report-tile-chevron"></i>' +
+                    '</button>';
             }
+            reportCardsHtml = '<div class="daily-report-tile-grid">' + tilesHtml + '</div>';
         }
 
         return '<div class="page-shell" id="pageDailyReport">' +
@@ -1131,6 +1130,28 @@ const Components = {
                 ? '<div class="card section-card"><div class="card-body" style="text-align:center;padding:24px;color:var(--gray-400)"><i class="fas fa-lock" style="font-size:1.5rem;margin-bottom:8px;display:block"></i><p>Reviewers cannot submit daily reports.</p></div></div>'
                 : '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-edit"></i> New report</h3></div><div class="card-body"><form id="dailyReportForm" class="modern-form"><div class="form-grid"><div class="form-card full"><div class="form-row"><div class="form-group half"><label for="dailyReportDate">Date *</label><input type="date" id="dailyReportDate" required></div><div class="form-group half"><label for="dailyReportFoodRemaining">Food remaining from evening</label><select id="dailyReportFoodRemaining"><option value="None">None</option><option value="Little">Little</option><option value="Moderate">Moderate</option><option value="Alot">Alot</option></select></div></div><div class="form-group"><label for="dailyReportFoodToday">Food eaten today</label><input type="text" id="dailyReportFoodToday" placeholder="e.g. Chicken and rice"></div><div class="form-group checkbox"><input type="checkbox" id="dailyReportKennelsWashed"><label for="dailyReportKennelsWashed">Kennels washed today</label></div><div class="form-group" id="kennelsWashedTimesGroup" style="display:none"><label for="dailyReportKennelsWashedTimes">How many times?</label><select id="dailyReportKennelsWashedTimes"><option value="1">1 time</option><option value="2">2 times</option><option value="3">3 times</option><option value="4">4+ times</option></select></div><div class="form-group"><label for="dailyReportVisitors">Visitors</label><textarea id="dailyReportVisitors" rows="2" placeholder="Any visitors to the kennel?"></textarea></div><div class="form-group"><label for="dailyReportPersonInCharge">Person in charge</label><input type="text" id="dailyReportPersonInCharge" placeholder="Staff name"></div><div class="form-group"><label for="dailyReportMedicationNotes">Medication notes</label><textarea id="dailyReportMedicationNotes" rows="2" placeholder="Any meds, doses, or reminders"></textarea></div><div class="form-group"><label for="dailyReportStaffComments">Staff comments</label><textarea id="dailyReportStaffComments" rows="2" placeholder="Brief staff observations"></textarea></div><div class="form-card"><div class="form-card-title"><i class="fas fa-dog"></i> Dog status checklist</div><div class="form-group"><label for="dailyReportDogSelect">Select dog</label><select id="dailyReportDogSelect">' + dogOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportDogHealth">Health status</label><select id="dailyReportDogHealth"><option value="">Select...</option><option value="Good">Good</option><option value="Needs Watch">Needs Watch</option></select></div><div class="form-group"><label for="dailyReportDogGrooming">Grooming status</label><select id="dailyReportDogGrooming"><option value="">Select...</option><option value="Clean">Clean</option><option value="Needs Grooming">Needs Grooming</option></select></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddDogStatus"><i class="fas fa-plus"></i> Add dog status</button><div id="dailyReportStatusList" style="margin-top:12px"></div></div><div class="form-card"><div class="form-card-title"><i class="fas fa-paw"></i> Puppy health checklist</div><div class="form-group"><label for="dailyReportPuppySelect">Select puppy</label><select id="dailyReportPuppySelect">' + puppyOptionsHtml + '</select></div><div class="form-group"><label for="dailyReportPuppyHealth">Health status</label><select id="dailyReportPuppyHealth"><option value="">Select...</option><option value="Healthy">Healthy</option><option value="Needs Observation">Needs Observation</option></select></div><div class="form-group"><label for="dailyReportPuppyMedication">Medication</label><input type="text" id="dailyReportPuppyMedication" placeholder="Medication and dose given"></div><button type="button" class="btn btn-secondary btn-sm" id="dailyReportAddPuppyStatus"><i class="fas fa-plus"></i> Add puppy status</button><div id="dailyReportPuppyStatusList" style="margin-top:12px"></div></div></div></form><div class="modal-footer" style="padding:0;margin-top:16px"><button class="btn btn-primary" id="dailyReportSave"><i class="fas fa-save"></i> Save report</button></div></div></div></div>') +
             '<div class="card section-card full-width"><div class="card-header"><h3><i class="fas fa-history"></i> Previous reports</h3></div><div class="card-body">' + reportCardsHtml + '</div></div></div></div>';
+    },
+
+    // Full detail markup for a single daily report, shown inside the daily report
+    // detail modal when a "Today's Report" / "<date> Report" tile is clicked.
+    dailyReportDetailHtml: function(report) {
+        var statusesHtml = '';
+        var statuses = report.dogStatuses || [];
+        var puppyStatusesHtml = '';
+        var puppyStatuses = report.puppyStatuses || [];
+        for (var j = 0; j < statuses.length; j++) {
+            var status = statuses[j];
+            statusesHtml += '<li><strong>' + (status.dogName || 'Dog') + '</strong> — Health: ' + (status.healthStatus || 'N/A') + ' • Grooming: ' + (status.groomingStatus || 'N/A') + '</li>';
+        }
+        for (var k = 0; k < puppyStatuses.length; k++) {
+            var puppyStatus = puppyStatuses[k];
+            puppyStatusesHtml += '<li><strong>' + (puppyStatus.puppyName || 'Puppy') + '</strong> — Health: ' + (puppyStatus.healthStatus || 'N/A') + (puppyStatus.medication ? ' • Medication: ' + puppyStatus.medication : '') + '</li>';
+        }
+        return '<h3 style="margin-bottom:14px"><i class="fas fa-calendar-day"></i> ' + (report.date ? new Date(report.date).toLocaleDateString() : 'Unknown date') + '</h3>' +
+            '<div class="detail-info-grid"><div class="detail-info-item"><label>Food remaining</label><p>' + (report.foodRemaining || 'N/A') + '</p></div><div class="detail-info-item"><label>Food today</label><p>' + (report.foodToday || 'N/A') + '</p></div><div class="detail-info-item"><label>Kennels washed</label><p>' + (report.kennelsWashed ? 'Yes' + (report.kennelsWashedTimes ? ' (' + report.kennelsWashedTimes + (report.kennelsWashedTimes === '1' ? ' time' : ' times') + ')' : '') : 'No') + '</p></div><div class="detail-info-item"><label>Visitors</label><p>' + (report.visitors || 'N/A') + '</p></div><div class="detail-info-item"><label>Person in charge</label><p>' + (report.personInCharge || 'N/A') + '</p></div></div>' +
+            '<div class="detail-info-grid" style="margin-top:12px"><div class="detail-info-item"><label>Staff comments</label><p>' + (report.staffComments || 'N/A') + '</p></div></div>' +
+            '<div style="margin-top:12px"><strong>Dog status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (statusesHtml || '<li>No dog status logged.</li>') + '</ul></div>' +
+            '<div style="margin-top:12px"><strong>Puppy health status</strong><ul style="margin:8px 0 0 18px;color:var(--gray-600)">' + (puppyStatusesHtml || '<li>No puppy health status logged.</li>') + '</ul></div>';
     },
 
     calendarPage: function() {
@@ -1248,11 +1269,11 @@ const Components = {
         }
 
         var addEventFormHtml = role !== 'reviewer'
-            ? '<form id="calendarEventForm" class="modern-form" style="margin-top:16px">' +
-              '<input type="hidden" id="calendarEventDate" value="' + selectedDate + '">' +
+            ? '<form id="calDayEventForm" class="modern-form" style="margin-top:16px">' +
+              '<input type="hidden" id="calDayEventDate" value="' + selectedDate + '">' +
               '<div class="form-row">' +
-              '<div class="form-group half"><label for="calendarEventTitle">Add an event for this day</label><input type="text" id="calendarEventTitle" placeholder="e.g. Vet visit, adopter viewing" required></div>' +
-              '<div class="form-group half"><label for="calendarEventNotes">Notes</label><input type="text" id="calendarEventNotes" placeholder="Optional details"></div>' +
+              '<div class="form-group half"><label for="calDayEventTitle">Add an event for this day</label><input type="text" id="calDayEventTitle" placeholder="e.g. Vet visit, adopter viewing" required></div>' +
+              '<div class="form-group half"><label for="calDayEventNotes">Notes</label><input type="text" id="calDayEventNotes" placeholder="Optional details"></div>' +
               '</div>' +
               '<button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add event</button>' +
               '</form>'

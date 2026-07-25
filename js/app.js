@@ -35,6 +35,7 @@ const App = {
         this.setupRecordForm();
         this.setupDeleteModal();
         this.setupInvoiceModal();
+        this.setupDailyReportDetailModal();
         this.render();
 
         // Subscribe to data changes. Renders are scheduled (coalesced) rather than
@@ -288,7 +289,7 @@ const App = {
 
         window.addEventListener('popstate', () => {
             // 1. Close any open modal first (highest priority)
-            const modalsToCheck = ['dogModal', 'recordModal', 'deleteModal', 'invoiceModal'];
+            const modalsToCheck = ['dogModal', 'recordModal', 'deleteModal', 'invoiceModal', 'dailyReportDetailModal'];
             for (const id of modalsToCheck) {
                 const el = document.getElementById(id);
                 if (el && el.classList.contains('open')) {
@@ -781,7 +782,7 @@ const App = {
         }
 
         if (this.currentPage === 'calendar') {
-            const eventForm = document.getElementById('calendarEventForm');
+            const eventForm = document.getElementById('calDayEventForm');
             if (eventForm) {
                 eventForm.onsubmit = (e) => {
                     e.preventDefault();
@@ -1801,6 +1802,37 @@ const App = {
         this.currentInvoiceEntryId = null;
     },
 
+    // ===== Daily Report Detail Modal =====
+    openDailyReportDetail(reportId) {
+        const report = KennelData.getDailyReports().find(function(r) { return r.id === reportId; });
+        if (!report) {
+            Components.toast('Unable to find this report.', 'error');
+            return;
+        }
+        const body = document.getElementById('dailyReportDetailBody');
+        if (body) body.innerHTML = Components.dailyReportDetailHtml(report);
+        document.getElementById('dailyReportDetailModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'dailyReportDetailModal' }, '', window.location.pathname + window.location.search);
+    },
+
+    closeDailyReportDetailModal() {
+        document.getElementById('dailyReportDetailModal').classList.remove('open');
+    },
+
+    setupDailyReportDetailModal() {
+        document.getElementById('dailyReportDetailModalCancel').addEventListener('click', () => {
+            this.closeDailyReportDetailModal();
+        });
+        document.getElementById('dailyReportDetailModalClose').addEventListener('click', () => {
+            this.closeDailyReportDetailModal();
+        });
+        document.getElementById('dailyReportDetailModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('dailyReportDetailModal')) {
+                this.closeDailyReportDetailModal();
+            }
+        });
+    },
+
     importData() {
         if (!this._requireEditAccess()) return;
         document.getElementById('importDataInput')?.click();
@@ -2102,9 +2134,9 @@ const App = {
 
     handleAddCalendarEvent() {
         if (!this._requireEditAccess()) return;
-        const dateInput = document.getElementById('calendarEventDate');
-        const titleInput = document.getElementById('calendarEventTitle');
-        const notesInput = document.getElementById('calendarEventNotes');
+        const dateInput = document.getElementById('calDayEventDate');
+        const titleInput = document.getElementById('calDayEventTitle');
+        const notesInput = document.getElementById('calDayEventNotes');
         const dateVal = dateInput ? dateInput.value : this.calendarSelectedDate;
         const titleVal = titleInput ? titleInput.value.trim() : '';
 

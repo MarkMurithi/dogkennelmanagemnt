@@ -1295,6 +1295,65 @@ body.modal-open {
     .calendar-nav { flex-wrap: wrap; }
 }
 
+/* ===== Daily report tiles (Previous reports) ===== */
+.daily-report-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.daily-report-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-100);
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: var(--gray-700);
+    transition: var(--transition);
+    width: 100%;
+}
+
+.daily-report-tile:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.daily-report-tile.is-today {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.daily-report-tile-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.daily-report-tile.is-today .daily-report-tile-icon { background: var(--primary-dark); }
+
+.daily-report-tile-text { flex: 1; min-width: 0; }
+.daily-report-tile-text h4 { font-size: 0.88rem; font-weight: 700; color: var(--gray-800); margin: 0; }
+.daily-report-tile-text p { font-size: 0.76rem; color: var(--gray-500); margin-top: 2px; }
+
+.daily-report-tile-chevron {
+    color: var(--gray-400);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
 
 .record-empty i { font-size: 2rem; margin-bottom: 8px; display: block; }
 .record-empty p { font-size: 0.9rem; }
