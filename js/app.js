@@ -8,6 +8,7 @@ const App = {
     currentDogViewFilters: { gender: '', search: '', sale: '' },
     selectedDogImageFiles: [],
     selectedDogPedigreeCertificate: null,
+    existingDogAttachments: [],
     currentInvoiceEntryId: null,
     pendingDailyReportDogId: null,
     navigationHistory: [],
@@ -1347,6 +1348,7 @@ const App = {
         document.getElementById('forSalePriceRow').style.display = 'none';
         this.selectedDogImageFiles = [];
         this.selectedDogPedigreeCertificate = null;
+        this.existingDogAttachments = [];
         const uploadLabel = document.getElementById('dogImageUploadLabel');
         if (uploadLabel) uploadLabel.textContent = 'Choose image files';
         const certificateLabel = document.getElementById('dogPedigreeCertificateLabel');
@@ -1383,8 +1385,13 @@ const App = {
         document.getElementById('dogPedigreeNotes').value = dog.pedigreeNotes || '';
         this.selectedDogImageFiles = [];
         this.selectedDogPedigreeCertificate = null;
+        this.existingDogAttachments = dog.attachments || [];
         const uploadLabel = document.getElementById('dogImageUploadLabel');
-        if (uploadLabel) uploadLabel.textContent = 'Choose image files';
+        if (uploadLabel) {
+            uploadLabel.textContent = this.existingDogAttachments.length > 0
+                ? `${this.existingDogAttachments.length} existing image${this.existingDogAttachments.length > 1 ? 's' : ''} on file — choose files to replace them`
+                : 'Choose image files';
+        }
         const certificateInput = document.getElementById('dogPedigreeCertificate');
         if (certificateInput) certificateInput.value = '';
         document.getElementById('dogPedigreeCertificateData').value = dog.pedigreeCertificate || '';
@@ -1481,12 +1488,12 @@ const App = {
                 };
 
             if (this.selectedDogImageFiles.length > 0) {
-                const attachments = [];
+                const attachments = new Array(this.selectedDogImageFiles.length);
                 let done = 0;
-                this.selectedDogImageFiles.forEach((file) => {
+                this.selectedDogImageFiles.forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = () => {
-                        attachments.push(reader.result);
+                        attachments[index] = reader.result;
                         done += 1;
                         if (done === this.selectedDogImageFiles.length) {
                             const pedigreeFile = this.selectedDogPedigreeCertificate;
@@ -1505,10 +1512,10 @@ const App = {
                 const pedigreeFile = this.selectedDogPedigreeCertificate;
                 if (pedigreeFile) {
                     const certificateReader = new FileReader();
-                    certificateReader.onload = () => saveDog(document.getElementById('dogImage').value.trim(), [], certificateReader.result, pedigreeFile.name);
+                    certificateReader.onload = () => saveDog(document.getElementById('dogImage').value.trim(), this.existingDogAttachments, certificateReader.result, pedigreeFile.name);
                     certificateReader.readAsDataURL(pedigreeFile);
                 } else {
-                    saveDog(document.getElementById('dogImage').value.trim(), []);
+                    saveDog(document.getElementById('dogImage').value.trim(), this.existingDogAttachments);
                 }
             }
         });
