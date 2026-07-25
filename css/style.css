@@ -1537,6 +1537,13 @@ body.modal-open {
 
 .form-group.half { margin-bottom: 0; }
 
+.form-row.four-col { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.form-group.quarter { margin-bottom: 0; }
+
+@media (max-width: 560px) {
+    .form-row.four-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 .form-group.checkbox {
     display: flex;
     align-items: center;

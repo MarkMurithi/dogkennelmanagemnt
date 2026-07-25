@@ -560,6 +560,16 @@ const App = {
                     const dateValue = document.getElementById('dailyReportDate').value;
                     const foodRemainingValue = document.getElementById('dailyReportFoodRemaining').value;
                     const foodTodayValue = document.getElementById('dailyReportFoodToday').value.trim();
+                    const puppiesFeedingMorningEl = document.getElementById('dailyReportPuppiesFeedingMorning');
+                    const puppiesFeedingAfternoonEl = document.getElementById('dailyReportPuppiesFeedingAfternoon');
+                    const puppiesFeedingEveningEl = document.getElementById('dailyReportPuppiesFeedingEvening');
+                    const puppiesFeedingNightEl = document.getElementById('dailyReportPuppiesFeedingNight');
+                    const puppiesFeedingValue = {
+                        morning: puppiesFeedingMorningEl ? puppiesFeedingMorningEl.value.trim() : '',
+                        afternoon: puppiesFeedingAfternoonEl ? puppiesFeedingAfternoonEl.value.trim() : '',
+                        evening: puppiesFeedingEveningEl ? puppiesFeedingEveningEl.value.trim() : '',
+                        night: puppiesFeedingNightEl ? puppiesFeedingNightEl.value.trim() : ''
+                    };
                     const kennelsWashedValue = document.getElementById('dailyReportKennelsWashed').checked;
                     const kennelsWashedTimesEl = document.getElementById('dailyReportKennelsWashedTimes');
                     const kennelsWashedTimesValue = kennelsWashedValue && kennelsWashedTimesEl ? kennelsWashedTimesEl.value : '';
@@ -574,6 +584,7 @@ const App = {
                         date: dateValue,
                         foodRemaining: foodRemainingValue,
                         foodToday: foodTodayValue,
+                        puppiesFeeding: puppiesFeedingValue,
                         kennelsWashed: kennelsWashedValue,
                         kennelsWashedTimes: kennelsWashedTimesValue,
                         dogStatuses: dogStatuses,
@@ -1714,7 +1725,7 @@ const App = {
 
     exportDailyReports() {
         const reports = KennelData.getDailyReports();
-        const lines = ['date,foodRemaining,foodToday,kennelsWashed,visitors,personInCharge,cleaningChecklist,staffComments,notes,dogStatuses,puppyStatuses'];
+        const lines = ['date,foodRemaining,foodToday,puppiesFeedingMorning,puppiesFeedingAfternoon,puppiesFeedingEvening,puppiesFeedingNight,kennelsWashed,visitors,personInCharge,cleaningChecklist,staffComments,notes,dogStatuses,puppyStatuses'];
         reports.forEach((report) => {
             const dogStatuses = (report.dogStatuses || []).map(function(item) {
                 return (item.dogName || 'Dog') + ': Health=' + (item.healthStatus || 'N/A') + '; Grooming=' + (item.groomingStatus || 'N/A') + '; Medication=' + (item.medication || 'N/A');
@@ -1726,6 +1737,10 @@ const App = {
                 (report.date || ''),
                 (report.foodRemaining || ''),
                 (report.foodToday || ''),
+                (report.puppiesFeeding && report.puppiesFeeding.morning) || '',
+                (report.puppiesFeeding && report.puppiesFeeding.afternoon) || '',
+                (report.puppiesFeeding && report.puppiesFeeding.evening) || '',
+                (report.puppiesFeeding && report.puppiesFeeding.night) || '',
                 report.kennelsWashed ? 'Yes' : 'No',
                 (report.visitors || ''),
                 (report.personInCharge || ''),
