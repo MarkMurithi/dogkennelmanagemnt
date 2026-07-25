@@ -2453,7 +2453,7 @@ body.modal-open {
 
 @media (max-width: 768px) {
     .kc-slide-title {
-        font-size: 0.95rem;
+        font-size: 1.02rem;
         overflow: hidden;
         text-overflow: ellipsis;
         display: -webkit-box;
@@ -2463,7 +2463,7 @@ body.modal-open {
 }
 
 @media (max-width: 480px) {
-    .kc-slide-title { font-size: 0.82rem; margin-bottom: 2px; }
+    .kc-slide-title { font-size: 0.9rem; margin-bottom: 2px; }
 }
 
 .kc-slide-sub {
@@ -2475,7 +2475,7 @@ body.modal-open {
 
 @media (max-width: 768px) {
     .kc-slide-sub {
-        font-size: 0.74rem;
+        font-size: 0.8rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -2483,7 +2483,7 @@ body.modal-open {
 }
 
 @media (max-width: 480px) {
-    .kc-slide-sub { font-size: 0.68rem; }
+    .kc-slide-sub { font-size: 0.74rem; }
 }
 
 .kc-btn {
@@ -2520,7 +2520,8 @@ body.modal-open {
 .kc-dots {
     position: absolute;
     bottom: 12px;
-    right: 18px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10;
     display: flex;
     gap: 6px;
@@ -2528,7 +2529,7 @@ body.modal-open {
 }
 
 @media (max-width: 480px) {
-    .kc-dots { bottom: 8px; right: 12px; }
+    .kc-dots { bottom: 8px; }
 }
 
 .kc-dot {
