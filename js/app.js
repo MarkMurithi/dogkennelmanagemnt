@@ -1440,6 +1440,22 @@ const App = {
                 return;
             }
 
+            const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image
+            const oversizedFile = this.selectedDogImageFiles.find((file) => file.size > MAX_IMAGE_BYTES);
+            if (oversizedFile) {
+                Components.toast(`"${oversizedFile.name}" is too large (max 8MB per image). Please choose a smaller photo.`, 'error');
+                return;
+            }
+
+            const saveBtn = document.getElementById('dogModalSave');
+            const saveBtnOriginalHtml = saveBtn ? saveBtn.innerHTML : '';
+            const setSaving = (isSaving) => {
+                if (!saveBtn) return;
+                saveBtn.disabled = isSaving;
+                saveBtn.innerHTML = isSaving ? '<i class="fas fa-spinner fa-spin"></i> Saving...' : saveBtnOriginalHtml;
+            };
+            setSaving(true);
+
             const saveDog = (imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue) => {
                 const dogData = {
                     name: document.getElementById('dogName').value.trim(),
@@ -1468,6 +1484,7 @@ const App = {
                 const dogId = document.getElementById('dogId').value;
                 const savePromise = dogId ? KennelData.updateDog(dogId, dogData) : KennelData.addDog(dogData);
                 savePromise.then((result) => {
+                    setSaving(false);
                     if (!result || !result.ok) {
                         Components.toast(result && result.error ? result.error : 'Unable to save dog', 'error');
                         return;
@@ -1480,6 +1497,9 @@ const App = {
                     document.getElementById('dogModal').classList.remove('open');
                     this.closeDogDetail();
                     this.render();
+                }).catch(() => {
+                    setSaving(false);
+                    Components.toast('Unable to save dog right now.', 'error');
                 });
             };
 
@@ -1487,18 +1507,31 @@ const App = {
                     saveDog(imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue);
                 };
 
+            const onFileReadError = (fileName) => {
+                setSaving(false);
+                Components.toast(`Unable to read "${fileName}". Please try a different file.`, 'error');
+            };
+
             if (this.selectedDogImageFiles.length > 0) {
                 const attachments = new Array(this.selectedDogImageFiles.length);
                 let done = 0;
+                let failed = false;
                 this.selectedDogImageFiles.forEach((file, index) => {
                     const reader = new FileReader();
+                    reader.onerror = () => {
+                        if (failed) return;
+                        failed = true;
+                        onFileReadError(file.name);
+                    };
                     reader.onload = () => {
+                        if (failed) return;
                         attachments[index] = reader.result;
                         done += 1;
                         if (done === this.selectedDogImageFiles.length) {
                             const pedigreeFile = this.selectedDogPedigreeCertificate;
                             if (pedigreeFile) {
                                 const certificateReader = new FileReader();
+                                certificateReader.onerror = () => onFileReadError(pedigreeFile.name);
                                 certificateReader.onload = () => finalizeSave(attachments[0], attachments, certificateReader.result, pedigreeFile.name);
                                 certificateReader.readAsDataURL(pedigreeFile);
                             } else {
@@ -1512,6 +1545,7 @@ const App = {
                 const pedigreeFile = this.selectedDogPedigreeCertificate;
                 if (pedigreeFile) {
                     const certificateReader = new FileReader();
+                    certificateReader.onerror = () => onFileReadError(pedigreeFile.name);
                     certificateReader.onload = () => saveDog(document.getElementById('dogImage').value.trim(), this.existingDogAttachments, certificateReader.result, pedigreeFile.name);
                     certificateReader.readAsDataURL(pedigreeFile);
                 } else {

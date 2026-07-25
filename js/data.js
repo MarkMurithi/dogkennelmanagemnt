@@ -92,7 +92,17 @@ const KennelData = {
 
     _requestWithMeta(path, options) {
         const config = this._buildRequestConfig(options);
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        if (controller) {
+            config.signal = controller.signal;
+        }
+        // Large uploads (e.g. dog photo attachments) combined with a cold-started
+        // free-tier server can otherwise hang indefinitely with no feedback to the
+        // user, since fetch() has no built-in timeout. Abort and surface an error
+        // instead of leaving the UI looking like nothing happened.
+        const timeoutId = controller ? setTimeout(function() { controller.abort(); }, 45000) : null;
         return fetch(this.apiBase + path, config).then(function(response) {
+            if (timeoutId) clearTimeout(timeoutId);
             return response.json().catch(function() { return {}; }).then(function(data) {
                 return {
                     ok: response.ok,
@@ -100,12 +110,13 @@ const KennelData = {
                     data: data
                 };
             });
-        }).catch(function() {
+        }).catch(function(error) {
+            if (timeoutId) clearTimeout(timeoutId);
             return {
                 ok: false,
                 status: 0,
                 data: null,
-                error: 'Unable to reach the server.'
+                error: (error && error.name === 'AbortError') ? 'The request timed out. Please check your connection and try again.' : 'Unable to reach the server.'
             };
         });
     },
