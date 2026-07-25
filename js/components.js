@@ -131,7 +131,9 @@ const Components = {
             imageHtml = placeholder;
         }
         var saleBadge = dog.forSale ? '<div class="dog-card-sale-badge">For Sale</div>' : '';
-        var priceTag = (dog.forSale && dog.price) ? '<span class="tag tag-for-sale">KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' : '';
+        var _cardRole = KennelData.getCurrentUserRole();
+        var _cardCanSeeMoney = _cardRole === 'admin' || _cardRole === 'reviewer';
+        var priceTag = (_cardCanSeeMoney && dog.forSale && dog.price) ? '<span class="tag tag-for-sale">KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' : (dog.forSale ? '<span class="tag tag-for-sale">For Sale</span>' : '');
         var imageFrame = '<div class="dog-card-image-frame">' + imageHtml + '</div>';
         var statusValue = dog.status || 'Active';
         var statusClass = 'tag-' + statusValue.toLowerCase();
@@ -401,15 +403,17 @@ const Components = {
                 fieldItem('Registration', safeDogRegistration) +
             '</div>';
 
+        var _detailRole = KennelData.getCurrentUserRole();
+        var _detailCanSeeMoney = _detailRole === 'admin' || _detailRole === 'reviewer';
         var pedigreeHtml =
             '<div class="profile-definition-grid">' +
                 fieldItem('Breed', safeDogBreed) +
-                fieldItem('Estimated value', formatMoney(dog.value)) +
+                (_detailCanSeeMoney ? fieldItem('Estimated value', formatMoney(dog.value)) : '') +
                 fieldItem('Sale status', dog.forSale ? 'Listed for sale' : 'Kennel owned') +
-                fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'Not listed') +
-                fieldItem('Ownership', safeDogOwnerName) +
-                fieldItem('Owner contact', safeDogOwnerPhone) +
-                fieldItem('Owner address', safeDogOwnerAddress) +
+                (_detailCanSeeMoney ? fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'Not listed') : '') +
+                (_detailCanSeeMoney ? fieldItem('Ownership', safeDogOwnerName) : '') +
+                (_detailCanSeeMoney ? fieldItem('Owner contact', safeDogOwnerPhone) : '') +
+                (_detailCanSeeMoney ? fieldItem('Owner address', safeDogOwnerAddress) : '') +
                 fieldItem('Pedigree notes', safeDogPedigreeNotes) +
             '</div>' +
             '<div class="profile-certificate-block">' +
@@ -424,13 +428,14 @@ const Components = {
             '<div class="profile-spotlight-grid">' + dailyHealthHtml + vetHealthHtml + '</div>' +
             '<div class="profile-callout">Use the Health tab below for the full medical timeline.</div>';
 
-        var saleSectionHtml =
-            '<div class="profile-definition-grid">' +
+        var saleSectionHtml = _detailCanSeeMoney
+            ? '<div class="profile-definition-grid">' +
                 fieldItem('For sale', dog.forSale ? 'Yes' : 'No') +
                 fieldItem('Sale price', dog.forSale ? formatMoney(dog.price) : 'N/A') +
                 fieldItem('Kennel value', formatMoney(dog.value)) +
                 fieldItem('Owner / keeper', dog.ownerName || 'Kennel managed') +
-            '</div>';
+              '</div>'
+            : '<p style="color:var(--gray-400);font-size:0.9rem">Sale and ownership details are restricted to admin and reviewer accounts.</p>';
 
         var overviewMetricsHtml =
             '<div class="profile-metrics-grid">' +
@@ -708,7 +713,7 @@ const Components = {
             this.statCard('fa-venus', stats.females, 'Females', 'red', "App.navigate('mydogs', { gender: 'Female' })") +
             this.statCard('fa-tag', stats.forSale, 'For Sale', 'green', "App.navigate('mydogs', { sale: 'sale' })") +
             this.statCard('fa-heart', stats.active, 'Active', 'yellow', "App.navigate('mydogs', { sale: 'active' })") +
-            this.statCard('fa-coins', formatCurrency(stats.totalValue), 'Total Value', 'green') +
+            (role === 'admin' || role === 'reviewer' ? this.statCard('fa-coins', formatCurrency(stats.totalValue), 'Total Value', 'green') : '') +
             '</div>' +
             '<div class="quick-actions">' +
             '<button class="quick-action-btn" onclick="App.showAddDog()"><i class="fas fa-plus-circle"></i> Add New Dog</button>' +
@@ -1118,14 +1123,22 @@ const Components = {
                 var healthStatusSource = (latestDailyHealth && latestDailyHealth.reportDate)
                     ? 'Daily report on ' + new Date(latestDailyHealth.reportDate).toLocaleDateString()
                     : 'Profile record';
-                var ownerProfileText = (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold')
-                    ? '<div class="detail-info-item"><label>Owner Name</label><p>' + (puppy.ownerName || 'N/A') + '</p></div>' +
+                var _puppyRole = KennelData.getCurrentUserRole();
+                var _puppyCanSeePrivate = _puppyRole === 'admin' || _puppyRole === 'reviewer';
+                var ownerProfileText;
+                if (!_puppyCanSeePrivate) {
+                    ownerProfileText = '<div class="detail-info-item" style="grid-column:1/-1"><p style="color:var(--gray-400);font-size:0.9rem">Owner and sale details are restricted to admin and reviewer accounts.</p></div>';
+                } else if (puppy.saleStatus === 'Booked' || puppy.saleStatus === 'Sold') {
+                    ownerProfileText =
+                      '<div class="detail-info-item"><label>Owner Name</label><p>' + (puppy.ownerName || 'N/A') + '</p></div>' +
                       '<div class="detail-info-item"><label>Phone Number</label><p>' + (puppy.ownerPhone || 'N/A') + '</p></div>' +
                       '<div class="detail-info-item"><label>Address</label><p>' + (puppy.ownerAddress || 'N/A') + '</p></div>' +
                       '<div class="detail-info-item"><label>Total Sale Amount</label><p>' + (puppy.saleTotalAmount !== undefined && puppy.saleTotalAmount !== null && puppy.saleTotalAmount !== '' ? 'KSh ' + Number(puppy.saleTotalAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' +
                       '<div class="detail-info-item"><label>Received Amount</label><p>' + (puppy.saleReceivedAmount !== undefined && puppy.saleReceivedAmount !== null && puppy.saleReceivedAmount !== '' ? 'KSh ' + Number(puppy.saleReceivedAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>' +
-                      '<div class="detail-info-item"><label>Unpaid Amount</label><p>' + (puppy.saleUnpaidAmount !== undefined && puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== '' ? 'KSh ' + Number(puppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>'
-                    : '<div class="detail-info-item"><label>Owner Details</label><p>Assigned when puppy is booked or sold.</p></div>';
+                      '<div class="detail-info-item"><label>Unpaid Amount</label><p>' + (puppy.saleUnpaidAmount !== undefined && puppy.saleUnpaidAmount !== null && puppy.saleUnpaidAmount !== '' ? 'KSh ' + Number(puppy.saleUnpaidAmount).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A') + '</p></div>';
+                } else {
+                    ownerProfileText = '<div class="detail-info-item"><label>Owner Details</label><p>Assigned when puppy is booked or sold.</p></div>';
+                }
 
                 puppyCardsHtml += '<div class="card section-card">' +
                     '<div class="card-header"><h3><i class="fas fa-paw"></i> ' + puppy.name + '</h3><div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary" onclick="App.editPuppy(\'' + puppy.id + '\')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="App.deletePuppy(\'' + puppy.id + '\')"><i class="fas fa-trash"></i></button></div></div>' +
