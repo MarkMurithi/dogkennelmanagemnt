@@ -1572,32 +1572,51 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not user:
                 return
             since = self.path.split("since=")[-1] if "since=" in self.path else ""
-            conn = self._connect()
             is_admin = user.get("role") == "admin"
-            if is_admin:
-                # Admins can see every conversation in the chat.
-                if since:
-                    rows = conn.execute(
-                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? ORDER BY createdAt ASC LIMIT 100",
-                        (since,)
-                    ).fetchall()
+
+            def fetch_rows(since_value):
+                conn = self._connect()
+                if is_admin:
+                    # Admins can see every conversation in the chat.
+                    if since_value:
+                        result_rows = conn.execute(
+                            "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? ORDER BY createdAt ASC LIMIT 100",
+                            (since_value,)
+                        ).fetchall()
+                    else:
+                        result_rows = conn.execute(
+                            "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages ORDER BY createdAt ASC LIMIT 100"
+                        ).fetchall()
                 else:
-                    rows = conn.execute(
-                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages ORDER BY createdAt ASC LIMIT 100"
-                    ).fetchall()
-            else:
-                # Reviewers/staff only see their own messages plus messages from admins.
-                if since:
-                    rows = conn.execute(
-                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? AND (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
-                        (since, user["id"])
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
-                        (user["id"],)
-                    ).fetchall()
-            conn.close()
+                    # Reviewers/staff only see their own messages plus messages from admins.
+                    if since_value:
+                        result_rows = conn.execute(
+                            "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? AND (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
+                            (since_value, user["id"])
+                        ).fetchall()
+                    else:
+                        result_rows = conn.execute(
+                            "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
+                            (user["id"],)
+                        ).fetchall()
+                conn.close()
+                return result_rows
+
+            rows = fetch_rows(since)
+
+            # Long-poll: if this is a "since" continuation request with nothing new yet,
+            # hold the connection open and re-check periodically so new messages are
+            # delivered the moment they're sent, instead of waiting for the next
+            # fixed-interval poll from the client.
+            if since and not rows:
+                waited = 0.0
+                poll_interval = 0.7
+                max_wait = 25.0
+                while waited < max_wait and not rows:
+                    time.sleep(poll_interval)
+                    waited += poll_interval
+                    rows = fetch_rows(since)
+
             messages = [{"id": r[0], "userId": r[1], "userName": r[2], "userRole": r[3], "content": r[4], "createdAt": r[5]} for r in rows]
             self._send_json(200, {"ok": True, "messages": messages})
             return

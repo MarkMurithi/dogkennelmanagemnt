@@ -70,21 +70,36 @@ const App = {
     },
 
     startChatPoll() {
-        if (this.chatPollId) { clearInterval(this.chatPollId); this.chatPollId = null; }
-        if (!KennelData.isAuthenticated()) return;
+        // chatPollId doubles as a generation token: bump it so any in-flight
+        // long-poll loop from a previous call recognizes it's been superseded and stops.
+        const token = (this.chatPollId || 0) + 1;
+        this.chatPollId = token;
+        if (!KennelData.isAuthenticated()) { this.chatPollId = null; return; }
 
-        // Initial load
+        // Initial load (returns immediately, no long-poll wait since there's no "since")
         KennelData.getChatMessages().then((msgs) => {
+            if (token !== this.chatPollId) return;
             this.chatMessages = msgs || [];
             if (msgs.length) this.chatLastTimestamp = msgs[msgs.length - 1].createdAt;
             if (this.currentPage === 'chat') this._renderChatMessages();
             this._updateChatNavBadge();
+            this._pollChatLoop(token);
         });
+    },
 
-        this.chatPollId = window.setInterval(() => {
-            if (!KennelData.isAuthenticated()) { clearInterval(this.chatPollId); this.chatPollId = null; return; }
-            KennelData.getChatMessages(this.chatLastTimestamp).then((newMsgs) => {
-                if (!newMsgs || !newMsgs.length) return;
+    // Long-polls for new chat messages so they arrive the instant they're sent,
+    // instead of waiting for a fixed interval. The server holds the request open
+    // (up to ~25s) until a new message shows up, then this immediately re-issues
+    // the request to keep listening.
+    _pollChatLoop(token) {
+        if (token !== this.chatPollId) return;
+        if (!KennelData.isAuthenticated()) { this.chatPollId = null; return; }
+
+        const startedAt = Date.now();
+        KennelData.getChatMessages(this.chatLastTimestamp).then((newMsgs) => {
+            if (token !== this.chatPollId) return;
+
+            if (newMsgs && newMsgs.length) {
                 this.chatMessages = this.chatMessages.concat(newMsgs);
                 this.chatLastTimestamp = this.chatMessages[this.chatMessages.length - 1].createdAt;
                 if (this.currentPage === 'chat') {
@@ -93,8 +108,20 @@ const App = {
                     this.chatUnreadCount += newMsgs.length;
                     this._updateChatNavBadge();
                 }
-            });
-        }, 8000);
+            }
+
+            // A genuine long-poll timeout takes several seconds server-side. If the
+            // response came back almost instantly with nothing, the request likely
+            // failed (offline/unreachable) rather than timed out - back off briefly
+            // so we don't hammer the network in a tight loop.
+            const elapsed = Date.now() - startedAt;
+            const wasLikelyFailure = (!newMsgs || !newMsgs.length) && elapsed < 2000;
+            if (wasLikelyFailure) {
+                window.setTimeout(() => this._pollChatLoop(token), 3000);
+            } else {
+                this._pollChatLoop(token);
+            }
+        });
     },
 
     _renderChatMessages() {
@@ -1133,7 +1160,8 @@ const App = {
                 this.sessionWatchdogId = null;
             }
             if (this.chatPollId) {
-                clearInterval(this.chatPollId);
+                // Setting this to null causes the in-flight long-poll loop (which checks
+                // this token before recursing) to stop itself on its next iteration.
                 this.chatPollId = null;
             }
             if (authScreen) {
