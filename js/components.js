@@ -962,7 +962,7 @@ const Components = {
     },
 
     healthRecordsPage: function() {
-        var dogs = KennelData.getDogs();
+        var dogs = KennelData.getDogs().filter(function(dog) { return dog.status === 'Active'; });
         var cardsHtml = '';
 
         for (var i = 0; i < dogs.length; i++) {
@@ -1036,6 +1036,10 @@ const Components = {
             cardsHtml += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-heartbeat"></i> ' + dog.name + '</h3></div><div class="card-body">' + recordsHtml + '</div></div>';
         }
 
+        if (!cardsHtml) {
+            cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-heartbeat" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No active dogs found</p></div>';
+        }
+
         return '<div class="page-shell" id="pageHealth">' +
             '<section class="page-hero">' +
             '<div><div class="hero-badge"><i class="fas fa-heartbeat"></i> Health tracking</div><h2>Monitor every medical milestone</h2><p>Review the latest health and vet visits for each dog in one place.</p></div>' +
@@ -1045,7 +1049,7 @@ const Components = {
     },
 
     breedingPage: function() {
-        var dogs = KennelData.getDogs();
+        var dogs = KennelData.getDogs().filter(function(dog) { return dog.gender === 'Female'; });
         var cardsHtml = '';
 
         for (var i = 0; i < dogs.length; i++) {
@@ -1068,6 +1072,10 @@ const Components = {
             }
 
             cardsHtml += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-dna"></i> ' + dog.name + '</h3></div><div class="card-body">' + recordsHtml + '</div></div>';
+        }
+
+        if (!cardsHtml) {
+            cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-dna" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No female dogs found</p></div>';
         }
 
         return '<div class="page-shell" id="pageBreeding">' +
