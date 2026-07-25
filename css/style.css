@@ -2254,6 +2254,58 @@ body.modal-open {
     border-radius: 4px;
 }
 
+.kc-slide-report {
+    border-left: 6px solid var(--primary);
+}
+
+.kc-report-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    font-size: 0.78rem;
+}
+
+.kc-report-stat {
+    background: rgba(200,169,81,0.15);
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: rgba(255,255,255,0.92);
+}
+
+.kc-report-stat strong {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .kc-report-details {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        font-size: 0.72rem;
+    }
+    
+    .kc-report-stat {
+        padding: 4px 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .kc-report-details {
+        grid-template-columns: 1fr;
+        gap: 4px;
+        font-size: 0.68rem;
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+    
+    .kc-report-stat {
+        padding: 4px 6px;
+    }
+}
+
 /* ===== Live Chat ===== */
 .chat-shell {
     display: flex;

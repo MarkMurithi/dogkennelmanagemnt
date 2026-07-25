@@ -497,31 +497,93 @@ const Components = {
     },
 
     kennelCarousel: function(dogs, stats) {
-        // ---- Generic lifestyle slides (always shown) ----
+        var personalisedSlides = [];
+        var safe = this.escapeHtml.bind(this);
+        
+        // ---- Daily briefing slide from previous day's report ----
+        var briefingSlide = null;
+        var reports = KennelData.getDailyReports();
+        if (reports && reports.length > 0) {
+            var lastReport = reports[0];
+            var reportDate = new Date(lastReport.date);
+            var today = new Date();
+            var yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            var isYesterday = reportDate.toDateString() === yesterday.toDateString();
+            
+            if (isYesterday || reportDate.toDateString() === today.toDateString()) {
+                var dogCount = (lastReport.dogStatuses || []).length;
+                var puppyCount = (lastReport.puppyStatuses || []).length;
+                var healthSummary = '';
+                var healthStatuses = {};
+                
+                if (lastReport.dogStatuses) {
+                    for (var dsi = 0; dsi < lastReport.dogStatuses.length; dsi++) {
+                        var ds = lastReport.dogStatuses[dsi];
+                        healthStatuses[ds.healthStatus] = (healthStatuses[ds.healthStatus] || 0) + 1;
+                    }
+                }
+                
+                var statusKeys = Object.keys(healthStatuses);
+                if (statusKeys.length > 0) {
+                    healthSummary = statusKeys.map(function(k) { return healthStatuses[k] + ' ' + k; }).join(' • ');
+                }
+                
+                var kennelStatus = lastReport.kennelsWashed ? '✓ Cleaned' : '○ Not cleaned';
+                if (lastReport.kennelsWashedTimes) {
+                    kennelStatus = '✓ Cleaned (' + lastReport.kennelsWashedTimes + 'x)';
+                }
+                
+                var briefTitle = safe(new Date(lastReport.date).toLocaleDateString()) + ' – ' + dogCount + ' dogs, ' + puppyCount + ' puppies';
+                var briefSub = 'Kennels: ' + kennelStatus + ' • Food: ' + (lastReport.foodRemaining || 'N/A') + ' remaining • ' + (lastReport.visitors ? 'Visitors: ' + lastReport.visitors : 'No visitors');
+                
+                briefingSlide = {
+                    img: 'https://images.unsplash.com/photo-1453227427063-ff1c26b89d53?w=960&h=420&fit=crop&crop=center',
+                    gradient: 'linear-gradient(135deg,rgba(20,50,80,0.78),rgba(10,80,120,0.58))',
+                    badge: 'Daily Briefing',
+                    icon: 'fa-clipboard-list',
+                    title: briefTitle,
+                    sub: briefSub,
+                    isReportSlide: true,
+                    reportData: {
+                        date: lastReport.date,
+                        dogCount: dogCount,
+                        puppyCount: puppyCount,
+                        kennelStatus: kennelStatus,
+                        healthSummary: healthSummary,
+                        foodToday: lastReport.foodToday || 'N/A',
+                        personInCharge: lastReport.personInCharge || 'N/A'
+                    }
+                };
+            }
+        }
+
+        // ---- German Shepherd lifestyle slides (always shown) ----
         var genericSlides = [
             {
-                img: 'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=960&h=420&fit=crop&crop=center',
+                img: 'https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=960&h=420&fit=crop&crop=center',
                 gradient: 'linear-gradient(135deg,rgba(30,30,30,0.72),rgba(80,60,20,0.55))',
                 badge: 'Training',
                 icon: 'fa-graduation-cap',
                 title: 'Discipline builds champions',
-                sub: 'Daily training keeps every dog sharp, focused, and ready'
+                sub: 'German Shepherds trained to peak performance'
             },
             {
-                img: 'https://images.unsplash.com/photo-1583511655826-05700d52f4d9?w=960&h=420&fit=crop&crop=center',
+                img: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=960&h=420&fit=crop&crop=center',
                 gradient: 'linear-gradient(135deg,rgba(10,40,20,0.72),rgba(20,80,40,0.55))',
-                badge: 'Security Patrol',
+                badge: 'Security Work',
                 icon: 'fa-shield-alt',
                 title: 'Protecting what matters most',
-                sub: 'German Shepherds on active duty — loyal, vigilant, unstoppable'
+                sub: 'German Shepherds on patrol — loyal & vigilant'
             },
             {
-                img: 'https://images.unsplash.com/photo-1568640347023-a616a30bc3bd?w=960&h=420&fit=crop&crop=center',
+                img: 'https://images.unsplash.com/photo-1558945506-a7cd4bbd94d1?w=960&h=420&fit=crop&crop=center',
                 gradient: 'linear-gradient(135deg,rgba(40,20,60,0.72),rgba(80,40,120,0.55))',
                 badge: 'Puppy Care',
                 icon: 'fa-paw',
                 title: 'Raising tomorrow\'s elite',
-                sub: 'Every litter is the beginning of an extraordinary K9 journey'
+                sub: 'German Shepherd puppies from premium bloodlines'
             },
             {
                 img: 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=960&h=420&fit=crop&crop=center',
@@ -529,26 +591,29 @@ const Components = {
                 badge: 'Health & Wellness',
                 icon: 'fa-heartbeat',
                 title: 'Health is the foundation',
-                sub: 'Regular vet checks, nutrition, and care keep the pack thriving'
+                sub: 'Vet-approved nutrition & care for our Shepherds'
             },
             {
-                img: 'https://images.unsplash.com/photo-1534361960057-19f4434a337d?w=960&h=420&fit=crop&crop=center',
+                img: 'https://images.unsplash.com/photo-1558985212-4b5c56011651?w=960&h=420&fit=crop&crop=center',
                 gradient: 'linear-gradient(135deg,rgba(20,30,60,0.72),rgba(40,60,120,0.55))',
-                badge: 'Feeding Time',
+                badge: 'Premium Feeding',
                 icon: 'fa-bone',
                 title: 'Fuelled for excellence',
-                sub: 'Balanced nutrition powers peak performance every day'
+                sub: 'High-protein nutrition for German Shepherd strength'
             }
         ];
 
         // ---- Personalised slides from actual dogs ----
-        var personalisedSlides = [];
-        var safe = this.escapeHtml.bind(this);
+        // Add briefing slide first if it exists
+        if (briefingSlide) {
+            personalisedSlides.push(briefingSlide);
+        }
 
-        // Upcoming events → personalised slide per dog (max 4)
+        // Upcoming events → personalised slide per dog (max 3 after briefing)
         var seenDogs = {};
+        var maxEventSlides = briefingSlide ? 3 : 4;
         if (stats && stats.upcomingEvents) {
-            for (var ei = 0; ei < stats.upcomingEvents.length && personalisedSlides.length < 4; ei++) {
+            for (var ei = 0; ei < stats.upcomingEvents.length && personalisedSlides.length < (maxEventSlides + (briefingSlide ? 1 : 0)); ei++) {
                 var ev = stats.upcomingEvents[ei];
                 if (seenDogs[ev.dogId]) continue;
                 seenDogs[ev.dogId] = true;
@@ -560,7 +625,7 @@ const Components = {
                 var evTitle = safe(ev.dogName) + ' — ' + evBadge + ' due ' + daysLabel;
                 var evSub = (ev.record && ev.record.type) ? safe(ev.record.type) : 'Care scheduled';
                 personalisedSlides.push({
-                    img: genericSlides[personalisedSlides.length % genericSlides.length].img,
+                    img: genericSlides[(personalisedSlides.length - (briefingSlide ? 1 : 0)) % genericSlides.length].img,
                     gradient: evColor,
                     badge: evBadge,
                     icon: evIcon,
@@ -572,12 +637,12 @@ const Components = {
         }
 
         // Recent activity slides (if no upcoming events personalisation, use recent activity)
-        if (personalisedSlides.length === 0) {
+        if (personalisedSlides.length === (briefingSlide ? 1 : 0)) {
             var activities = KennelData.getActivities(3);
             for (var ai = 0; ai < activities.length; ai++) {
                 var act = activities[ai];
                 personalisedSlides.push({
-                    img: genericSlides[ai % genericSlides.length].img,
+                    img: genericSlides[(briefingSlide ? 1 : 0) + ai % genericSlides.length].img,
                     gradient: genericSlides[ai % genericSlides.length].gradient,
                     badge: 'Recent Activity',
                     icon: 'fa-history',
@@ -587,7 +652,7 @@ const Components = {
             }
         }
 
-        // Merge: personalised first, then generic (total max 7)
+        // Merge: personalised first (including briefing), then generic (total max 7)
         var allSlides = personalisedSlides.concat(genericSlides).slice(0, 7);
 
         var slidesHtml = '';
@@ -595,14 +660,22 @@ const Components = {
         for (var si = 0; si < allSlides.length; si++) {
             var sl = allSlides[si];
             var isActive = si === 0;
+            var slideClass = 'kc-slide' + (isActive ? ' active' : '') + (sl.isReportSlide ? ' kc-slide-report' : '');
+            var slideClickAttr = sl.dogId ? ' onclick="App.openDogDetail(\'' + sl.dogId + '\')" style="cursor:pointer"' : '';
             slidesHtml +=
-                '<div class="kc-slide' + (isActive ? ' active' : '') + '" data-index="' + si + '"' + (sl.dogId ? ' onclick="App.openDogDetail(\'' + sl.dogId + '\')" style="cursor:pointer"' : '') + '>' +
+                '<div class="' + slideClass + '" data-index="' + si + '"' + slideClickAttr + '>' +
                 '<div class="kc-slide-bg" style="background:' + sl.gradient + '"></div>' +
                 '<img class="kc-slide-img" src="' + sl.img + '" alt="" loading="lazy" onerror="this.style.opacity=\'0\'">' +
                 '<div class="kc-slide-content">' +
                 '<div class="kc-slide-badge"><i class="fas ' + sl.icon + '"></i> ' + sl.badge + '</div>' +
                 '<h3 class="kc-slide-title">' + sl.title + '</h3>' +
                 '<p class="kc-slide-sub">' + sl.sub + '</p>' +
+                (sl.isReportSlide && sl.reportData ? 
+                    '<div class="kc-report-details">' +
+                    '<div class="kc-report-stat"><strong>Food today:</strong> ' + safe(sl.reportData.foodToday) + '</div>' +
+                    '<div class="kc-report-stat"><strong>Staff:</strong> ' + safe(sl.reportData.personInCharge) + '</div>' +
+                    (sl.reportData.healthSummary ? '<div class="kc-report-stat"><strong>Health:</strong> ' + safe(sl.reportData.healthSummary) + '</div>' : '') +
+                    '</div>' : '') +
                 '</div></div>';
             dotsHtml += '<button class="kc-dot' + (isActive ? ' active' : '') + '" data-dot="' + si + '" aria-label="Slide ' + (si + 1) + '"></button>';
         }
