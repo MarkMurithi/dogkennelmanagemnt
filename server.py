@@ -481,11 +481,14 @@ class KennelHandler(BaseHTTPRequestHandler):
             return None
         conn = self._connect()
         row = conn.execute(
-            "SELECT u.id, u.name, u.email, u.role FROM auth_tokens t JOIN users u ON u.id = t.user_id WHERE t.token = ? AND t.revoked = 0 AND t.expiresAt > ?",
+            "SELECT u.id, u.name, u.email, u.role, u.active FROM auth_tokens t JOIN users u ON u.id = t.user_id WHERE t.token = ? AND t.revoked = 0 AND t.expiresAt > ?",
             (token, self._now()),
         ).fetchone()
         conn.close()
         if not row:
+            return None
+        # Reject disabled accounts immediately
+        if not bool(row[4]):
             return None
         return {"id": row[0], "name": row[1], "email": row[2], "role": row[3]}
 
@@ -1485,8 +1488,12 @@ class KennelHandler(BaseHTTPRequestHandler):
                     updates.append("role = ?")
                     values.append(requested_role)
                 if "active" in payload:
+                    new_active = int(bool(payload.get("active", True)))
                     updates.append("active = ?")
-                    values.append(int(bool(payload.get("active", True))))
+                    values.append(new_active)
+                    # If disabling, revoke all tokens for that user immediately
+                    if new_active == 0:
+                        conn.execute("DELETE FROM auth_tokens WHERE user_id = ?", (target_id,))
                 if "password" in payload and str(payload.get("password", "")).strip():
                     updates.append("password = ?")
                     values.append(self._hash_password(str(payload.get("password", "")).strip()))

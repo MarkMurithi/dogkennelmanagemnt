@@ -1079,6 +1079,26 @@ const KennelData = {
         return Boolean(this._currentUser);
     },
 
+    // Polls /auth/me to detect if current user has been disabled by admin
+    checkSessionActive() {
+        if (!this._currentUser) return Promise.resolve(false);
+        const token = this._getStoredToken();
+        if (!token) return Promise.resolve(false);
+        return this._requestWithMeta('/auth/me').then(function(result) {
+            if (result.status === 401 || (result.ok && result.data && result.data.user && result.data.user.active === false)) {
+                this._currentUser = null;
+                this._clearAuthState();
+                this._save();
+                this._setServerState('auth', 'Your account has been disabled. Contact the administrator.');
+                this._notify();
+                return false;
+            }
+            return true;
+        }.bind(this)).catch(function() {
+            return true; // network error - don't kick out, just skip
+        });
+    },
+
     exportReportCsv() {
         function escapeCsv(value) {
             var stringValue = value === null || value === undefined ? '' : String(value);

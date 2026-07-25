@@ -12,6 +12,7 @@ const App = {
     pendingDailyReportDogId: null,
     navigationHistory: [],
     submissionStatusPollId: null,
+    sessionWatchdogId: null,
     lastFinanceSnapshot: null,
     _settingsDataLoaded: false,
     editingUserId: null,
@@ -33,7 +34,35 @@ const App = {
 
         if (KennelData.isAuthenticated()) {
             this.startSubmissionStatusPolling();
+            this.startSessionWatchdog();
         }
+    },
+
+    startSessionWatchdog() {
+        if (this.sessionWatchdogId) {
+            clearInterval(this.sessionWatchdogId);
+            this.sessionWatchdogId = null;
+        }
+        if (!KennelData.isAuthenticated()) return;
+        this.sessionWatchdogId = window.setInterval(() => {
+            if (!KennelData.isAuthenticated()) {
+                clearInterval(this.sessionWatchdogId);
+                this.sessionWatchdogId = null;
+                return;
+            }
+            KennelData.checkSessionActive().then((active) => {
+                if (!active) {
+                    clearInterval(this.sessionWatchdogId);
+                    this.sessionWatchdogId = null;
+                    if (this.submissionStatusPollId) {
+                        clearInterval(this.submissionStatusPollId);
+                        this.submissionStatusPollId = null;
+                    }
+                    Components.toast('Your account has been disabled. Please contact the administrator.', 'error');
+                    this.render();
+                }
+            });
+        }, 15000);
     },
 
     startSubmissionStatusPolling() {
@@ -913,6 +942,10 @@ const App = {
                 clearInterval(this.submissionStatusPollId);
                 this.submissionStatusPollId = null;
             }
+            if (this.sessionWatchdogId) {
+                clearInterval(this.sessionWatchdogId);
+                this.sessionWatchdogId = null;
+            }
             if (authScreen) {
                 authScreen.innerHTML = Components.authPage();
             }
@@ -936,6 +969,10 @@ const App = {
 
         if (!this.submissionStatusPollId) {
             this.startSubmissionStatusPolling();
+        }
+
+        if (!this.sessionWatchdogId) {
+            this.startSessionWatchdog();
         }
 
         if (!this.canAccessPage(this.currentPage)) {
