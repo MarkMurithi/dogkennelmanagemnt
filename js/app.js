@@ -73,6 +73,25 @@ const App = {
         window.history.replaceState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
 
         window.addEventListener('popstate', () => {
+            // 1. Close any open modal first (highest priority)
+            const modalsToCheck = ['dogModal', 'recordModal', 'deleteModal', 'invoiceModal'];
+            for (const id of modalsToCheck) {
+                const el = document.getElementById(id);
+                if (el && el.classList.contains('open')) {
+                    el.classList.remove('open');
+                    window.history.pushState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
+                    return;
+                }
+            }
+
+            // 2. Close dog detail panel if open
+            if (document.getElementById('dogDetailOverlay')) {
+                this.closeDogDetail();
+                window.history.pushState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
+                return;
+            }
+
+            // 3. Navigate back to previous page
             if (this.navigationHistory.length === 0) {
                 window.history.replaceState({ page: this.currentPage }, '', window.location.pathname + window.location.search);
                 return;
@@ -992,6 +1011,7 @@ const App = {
         const certificateName = document.getElementById('dogPedigreeCertificateName');
         if (certificateName) certificateName.value = '';
         document.getElementById('dogModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'dogModal' }, '', window.location.pathname + window.location.search);
     },
 
     editDog(dogId) {
@@ -1035,6 +1055,7 @@ const App = {
         
         document.getElementById('forSalePriceRow').style.display = dog.forSale ? 'block' : 'none';
         document.getElementById('dogModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'dogModal' }, '', window.location.pathname + window.location.search);
     },
 
     setupDogForm() {
@@ -1173,6 +1194,9 @@ const App = {
 
         document.body.insertAdjacentHTML('beforeend', Components.dogDetailPanel(dog));
         document.body.classList.add('modal-open');
+
+        // Push a history entry so the back button closes the panel
+        window.history.pushState({ page: this.currentPage, panel: 'dogDetail' }, '', window.location.pathname + window.location.search);
 
         this.setupDetailTabs();
     },
@@ -1429,6 +1453,7 @@ const App = {
         const invoiceContent = document.getElementById('invoiceContent');
 
         document.getElementById('invoiceModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'invoiceModal' }, '', window.location.pathname + window.location.search);
         invoiceContent.innerHTML = '<div class="invoice-paper"><div class="invoice-header"><div><h3>Bigpaw Kennel</h3><p>Invoice</p></div><div><strong>#INV-' + entry.id + '</strong><p>' + new Date(entry.date).toLocaleDateString() + '</p></div></div><div class="invoice-body"><div><strong>Billed to</strong><p>' + (entry.related || 'Customer') + '</p></div><div><strong>Service</strong><p>' + (entry.category || 'Transaction') + '</p></div><div><strong>Amount</strong><p>' + 'KSh ' + Number(entry.amount || 0).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</p></div></div><div class="invoice-footer"><p>' + (entry.notes || 'Thank you for your business.') + '</p></div></div>';
     },
 
@@ -1472,6 +1497,7 @@ const App = {
         const dog = KennelData.getDog(dogId);
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete ${dog.name}? This action cannot be undone.`;
         document.getElementById('deleteModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'deleteModal' }, '', window.location.pathname + window.location.search);
         document.getElementById('deleteModalConfirm').onclick = () => {
             KennelData.deleteDog(dogId).then((result) => {
                 document.getElementById('deleteModal').classList.remove('open');
@@ -1518,6 +1544,7 @@ const App = {
         recordModalTitle.textContent = `Add ${labels[recordType] || 'Record'}`;
         recordFormFields.innerHTML = Components.getRecordFormFields(recordType);
         recordModal.classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'recordModal' }, '', window.location.pathname + window.location.search);
     },
 
     editRecord(dogId, recordType, recordId) {
@@ -1550,6 +1577,7 @@ const App = {
         recordModalTitle.textContent = `Edit ${labels[recordType] || 'Record'}`;
         recordFormFields.innerHTML = Components.getRecordFormFields(recordType, record);
         recordModal.classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'recordModal' }, '', window.location.pathname + window.location.search);
     },
 
     setupRecordForm() {
@@ -1651,6 +1679,7 @@ const App = {
         const dog = KennelData.getDog(dogId);
         document.getElementById('deleteModalMessage').textContent = `Are you sure you want to delete this record for ${dog.name}?`;
         document.getElementById('deleteModal').classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'deleteModal' }, '', window.location.pathname + window.location.search);
         document.getElementById('deleteModalConfirm').onclick = () => {
             KennelData.deleteRecord(dogId, recordType, recordId).then((result) => {
                 document.getElementById('deleteModal').classList.remove('open');
