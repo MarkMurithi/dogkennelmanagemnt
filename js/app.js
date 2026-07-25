@@ -187,6 +187,15 @@ const App = {
             const dogHealth = document.getElementById('dailyReportDogHealth');
             const dogGrooming = document.getElementById('dailyReportDogGrooming');
             let dogMedication = document.getElementById('dailyReportDogMedication');
+
+            // Show/hide kennels washed times
+            const kennelsWashedCheckbox = document.getElementById('dailyReportKennelsWashed');
+            const kennelsWashedTimesGroup = document.getElementById('kennelsWashedTimesGroup');
+            if (kennelsWashedCheckbox && kennelsWashedTimesGroup) {
+                kennelsWashedCheckbox.addEventListener('change', () => {
+                    kennelsWashedTimesGroup.style.display = kennelsWashedCheckbox.checked ? '' : 'none';
+                });
+            }
             const legacyMedicationNotes = document.getElementById('dailyReportMedicationNotes');
             if (legacyMedicationNotes) {
                 const legacyMedicationGroup = legacyMedicationNotes.closest('.form-group');
@@ -255,7 +264,8 @@ const App = {
                     item.className = 'detail-info-item';
                     const puppyName = Components.escapeHtml(entry.puppyName || 'Puppy');
                     const puppyHealth = Components.escapeHtml(entry.healthStatus || 'N/A');
-                    item.innerHTML = '<label>' + puppyName + '</label><p>Health: ' + puppyHealth + ' <button type="button" class="btn-text-danger" data-puppy-index="' + index + '"><i class="fas fa-times"></i></button></p>';
+                    const puppyMedNote = entry.medication ? (' • Medication: ' + Components.escapeHtml(entry.medication)) : '';
+                    item.innerHTML = '<label>' + puppyName + '</label><p>Health: ' + puppyHealth + puppyMedNote + ' <button type="button" class="btn-text-danger" data-puppy-index="' + index + '"><i class="fas fa-times"></i></button></p>';
                     puppyStatusList.appendChild(item);
                 });
                 puppyStatusList.querySelectorAll('button[data-puppy-index]').forEach((button) => {
@@ -273,8 +283,8 @@ const App = {
                         return;
                     }
                     const label = dogSelect.options[dogSelect.selectedIndex]?.text || 'Dog';
-                    const healthValue = dogHealth ? dogHealth.value.trim() : '';
-                    const groomingValue = dogGrooming ? dogGrooming.value.trim() : '';
+                    const healthValue = dogHealth ? dogHealth.value : '';
+                    const groomingValue = dogGrooming ? dogGrooming.value : '';
                     const medicationValue = dogMedication ? dogMedication.value.trim() : '';
                     if (!healthValue && !groomingValue && !medicationValue) {
                         Components.toast('Please add at least one status detail.', 'error');
@@ -295,13 +305,16 @@ const App = {
                         return;
                     }
                     const label = puppySelect.options[puppySelect.selectedIndex]?.text || 'Puppy';
-                    const healthValue = puppyHealth ? puppyHealth.value.trim() : '';
+                    const healthValue = puppyHealth ? puppyHealth.value : '';
+                    const puppyMedEl = document.getElementById('dailyReportPuppyMedication');
+                    const puppyMedValue = puppyMedEl ? puppyMedEl.value.trim() : '';
                     if (!healthValue) {
-                        Components.toast('Please enter puppy health status.', 'error');
+                        Components.toast('Please select puppy health status.', 'error');
                         return;
                     }
-                    puppyStatuses.push({ puppyId: puppySelect.value, puppyName: label, healthStatus: healthValue });
+                    puppyStatuses.push({ puppyId: puppySelect.value, puppyName: label, healthStatus: healthValue, medication: puppyMedValue });
                     puppyHealth.value = '';
+                    if (puppyMedEl) puppyMedEl.value = '';
                     renderPuppyStatusList();
                 });
             }
@@ -314,11 +327,11 @@ const App = {
                     const foodRemainingValue = document.getElementById('dailyReportFoodRemaining').value;
                     const foodTodayValue = document.getElementById('dailyReportFoodToday').value.trim();
                     const kennelsWashedValue = document.getElementById('dailyReportKennelsWashed').checked;
+                    const kennelsWashedTimesEl = document.getElementById('dailyReportKennelsWashedTimes');
+                    const kennelsWashedTimesValue = kennelsWashedValue && kennelsWashedTimesEl ? kennelsWashedTimesEl.value : '';
                     const visitorsValue = document.getElementById('dailyReportVisitors').value.trim();
                     const personInChargeValue = document.getElementById('dailyReportPersonInCharge').value.trim();
-                    const cleaningChecklistValue = document.getElementById('dailyReportCleaningChecklist').value.trim();
                     const staffCommentsValue = document.getElementById('dailyReportStaffComments').value.trim();
-                    const notesValue = document.getElementById('dailyReportNotes').value.trim();
                     if (!dateValue) {
                         Components.toast('Please choose a report date.', 'error');
                         return;
@@ -328,13 +341,12 @@ const App = {
                         foodRemaining: foodRemainingValue,
                         foodToday: foodTodayValue,
                         kennelsWashed: kennelsWashedValue,
+                        kennelsWashedTimes: kennelsWashedTimesValue,
                         dogStatuses: dogStatuses,
                         puppyStatuses: puppyStatuses,
                         visitors: visitorsValue,
                         personInCharge: personInChargeValue,
-                        cleaningChecklist: cleaningChecklistValue,
-                        staffComments: staffCommentsValue,
-                        notes: notesValue
+                        staffComments: staffCommentsValue
                     };
                     KennelData.addDailyReport(payload).then((result) => {
                         if (!result || !result.ok) {
