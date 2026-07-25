@@ -9,6 +9,13 @@ const Components = {
             .replace(/'/g, '&#39;');
     },
 
+    formatDateYMD(date) {
+        var y = date.getFullYear();
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        var d = String(date.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + d;
+    },
+
     authPage() {
         return '<div class="auth-card">' +
             '<div class="auth-brand"><i class="fas fa-shield-alt"></i><span>Secure access to Bigpaw Kennel</span></div>' +
@@ -1127,53 +1134,153 @@ const Components = {
     },
 
     calendarPage: function() {
-        var stats = KennelData.getStats();
-        var upcomingHtml = '';
+        var safe = this.escapeHtml.bind(this);
         var now = new Date();
-        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var todayStr = this.formatDateYMD(now);
+        var viewYear = (typeof App !== 'undefined' && typeof App.calendarViewYear === 'number') ? App.calendarViewYear : now.getFullYear();
+        var viewMonth = (typeof App !== 'undefined' && typeof App.calendarViewMonth === 'number') ? App.calendarViewMonth : now.getMonth();
+        var selectedDate = (typeof App !== 'undefined' && App.calendarSelectedDate) ? App.calendarSelectedDate : todayStr;
+        var role = KennelData.getCurrentUserRole();
 
-        if (stats.upcomingEvents.length === 0) {
-            upcomingHtml = '<p style="color:var(--gray-400)">No upcoming items right now.</p>';
-        } else {
-            for (var i = 0; i < stats.upcomingEvents.length && i < 8; i++) {
-                var event = stats.upcomingEvents[i];
-                var dueDate = new Date(event.nextDue);
-                var dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-                var isDueToday = dueStart.getTime() === todayStart.getTime();
-                var isMarkedDone = Boolean(event.record && event.record.alertDismissedFor && event.record.alertDismissedFor === event.nextDue);
-                var dueLabel = isDueToday ? 'Due today' : ('Due ' + dueDate.toLocaleDateString());
-                var duePulseClass = isDueToday && !isMarkedDone ? ' calendar-upcoming-item-live' : '';
-                var actionHtml = '';
-                if (isDueToday && event.record && event.record.id && !isMarkedDone) {
-                    actionHtml = KennelData.getCurrentUserRole() !== 'reviewer'
-                        ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
-                          '<button class="btn btn-sm btn-secondary" onclick="App.markCalendarUpcomingDone(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.nextDue + '\')">Done</button>' +
-                          '<button class="btn btn-sm btn-secondary" onclick="App.postponeCalendarUpcoming(\'' + event.dogId + '\',\'' + event.type + '\',\'' + event.record.id + '\',\'' + event.dueField + '\',\'' + event.nextDue + '\')">Postpone</button>' +
-                          '</div>'
-                        : '';
-                }
-                var doneTickHtml = isMarkedDone
-                    ? '<div class="calendar-task-done-indicator" title="Completed" aria-label="Task completed"><i class="fas fa-check-circle"></i></div>'
-                    : '';
-                upcomingHtml += '<div class="alert-item calendar-upcoming-item' + duePulseClass + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
-                    '<div class="alert-content">' +
-                    '<h4>' + event.dogName + '</h4>' +
-                    '<p>' + event.type + ' • ' + (event.record.type || 'Upcoming task') + '</p>' +
-                    '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + dueLabel + '</p>' +
-                    actionHtml +
-                    '</div>' +
-                    doneTickHtml +
+        var monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        var weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        var firstOfMonth = new Date(viewYear, viewMonth, 1);
+        var startWeekday = firstOfMonth.getDay();
+        var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        var daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+        var totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7;
+
+        var weekdayHeaderHtml = '';
+        for (var w = 0; w < weekdayNames.length; w++) {
+            weekdayHeaderHtml += '<div class="calendar-weekday">' + weekdayNames[w] + '</div>';
+        }
+
+        var cellsHtml = '';
+        for (var i = 0; i < totalCells; i++) {
+            var offset = i - startWeekday;
+            var dayNum, cellYear, cellMonth, isOtherMonth;
+            if (offset < 0) {
+                dayNum = daysInPrevMonth + offset + 1;
+                cellMonth = viewMonth - 1;
+                cellYear = viewYear;
+                if (cellMonth < 0) { cellMonth = 11; cellYear -= 1; }
+                isOtherMonth = true;
+            } else if (offset >= daysInMonth) {
+                dayNum = offset - daysInMonth + 1;
+                cellMonth = viewMonth + 1;
+                cellYear = viewYear;
+                if (cellMonth > 11) { cellMonth = 0; cellYear += 1; }
+                isOtherMonth = true;
+            } else {
+                dayNum = offset + 1;
+                cellMonth = viewMonth;
+                cellYear = viewYear;
+                isOtherMonth = false;
+            }
+            var cellDateStr = cellYear + '-' + String(cellMonth + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+            var dayInfo = KennelData.getCalendarDayInfo(cellDateStr);
+            var itemCount = dayInfo.tasks.length + dayInfo.events.length;
+            var hasOverdueTask = dayInfo.tasks.length > 0 && cellDateStr < todayStr;
+
+            var cellClasses = 'calendar-day-cell' +
+                (isOtherMonth ? ' other-month' : '') +
+                (cellDateStr === todayStr ? ' is-today' : '') +
+                (cellDateStr === selectedDate ? ' is-selected' : '') +
+                (hasOverdueTask ? ' has-overdue' : '');
+
+            var dotsHtml = '';
+            if (dayInfo.tasks.length > 0) dotsHtml += '<span class="calendar-day-dot task"></span>';
+            if (dayInfo.events.length > 0) dotsHtml += '<span class="calendar-day-dot event"></span>';
+
+            cellsHtml += '<button type="button" class="' + cellClasses + '" onclick="App.calendarSelectDate(\'' + cellDateStr + '\')">' +
+                '<span class="calendar-day-number">' + dayNum + '</span>' +
+                (itemCount > 0 ? '<span class="calendar-day-count">' + itemCount + '</span>' : '') +
+                '<span class="calendar-day-dots">' + dotsHtml + '</span>' +
+                '</button>';
+        }
+
+        var selectedInfo = KennelData.getCalendarDayInfo(selectedDate);
+        var selectedDateObj = new Date(selectedDate + 'T00:00:00');
+        var selectedLabel = isNaN(selectedDateObj.getTime())
+            ? selectedDate
+            : selectedDateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        var detailItemsHtml = '';
+        for (var t = 0; t < selectedInfo.tasks.length; t++) {
+            var task = selectedInfo.tasks[t];
+            var isMarkedDone = Boolean(task.record && task.record.alertDismissedFor && task.record.alertDismissedFor === task.nextDue);
+            var isOverdue = selectedDate < todayStr;
+            var taskActionsHtml = '';
+            if (task.record && task.record.id && !isMarkedDone && role !== 'reviewer') {
+                taskActionsHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' +
+                    '<button class="btn btn-sm btn-secondary" onclick="App.markCalendarUpcomingDone(\'' + task.dogId + '\',\'' + task.type + '\',\'' + task.record.id + '\',\'' + task.nextDue + '\')">Done</button>' +
+                    '<button class="btn btn-sm btn-secondary" onclick="App.postponeCalendarUpcoming(\'' + task.dogId + '\',\'' + task.type + '\',\'' + task.record.id + '\',\'' + task.dueField + '\',\'' + task.nextDue + '\')">Postpone</button>' +
                     '</div>';
             }
+            var doneTickHtml = isMarkedDone
+                ? '<div class="calendar-task-done-indicator" title="Completed" aria-label="Task completed"><i class="fas fa-check-circle"></i></div>'
+                : '';
+            detailItemsHtml += '<div class="alert-item calendar-upcoming-item' + (isOverdue && !isMarkedDone ? ' danger' : '') + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                '<div class="alert-content">' +
+                '<h4>' + safe(task.dogName) + '</h4>' +
+                '<p>' + safe(task.type) + ' \u2022 ' + safe(task.record.type || 'Upcoming task') + '</p>' +
+                taskActionsHtml +
+                '</div>' +
+                doneTickHtml +
+                '</div>';
         }
+        for (var e = 0; e < selectedInfo.events.length; e++) {
+            var evt = selectedInfo.events[e];
+            var deleteActionHtml = role !== 'reviewer'
+                ? '<button class="btn btn-sm btn-secondary" onclick="App.deleteCalendarEventEntry(\'' + evt.id + '\')"><i class="fas fa-trash"></i></button>'
+                : '';
+            detailItemsHtml += '<div class="alert-item calendar-event-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                '<div class="alert-content">' +
+                '<h4><i class="fas fa-calendar-day"></i> ' + safe(evt.title) + '</h4>' +
+                (evt.notes ? '<p>' + safe(evt.notes) + '</p>' : '') +
+                '</div>' +
+                deleteActionHtml +
+                '</div>';
+        }
+        if (!detailItemsHtml) {
+            detailItemsHtml = '<p style="color:var(--gray-400)">Nothing scheduled for this day.</p>';
+        }
+
+        var addEventFormHtml = role !== 'reviewer'
+            ? '<form id="calendarEventForm" class="modern-form" style="margin-top:16px">' +
+              '<input type="hidden" id="calendarEventDate" value="' + selectedDate + '">' +
+              '<div class="form-row">' +
+              '<div class="form-group half"><label for="calendarEventTitle">Add an event for this day</label><input type="text" id="calendarEventTitle" placeholder="e.g. Vet visit, adopter viewing" required></div>' +
+              '<div class="form-group half"><label for="calendarEventNotes">Notes</label><input type="text" id="calendarEventNotes" placeholder="Optional details"></div>' +
+              '</div>' +
+              '<button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add event</button>' +
+              '</form>'
+            : '';
 
         return '<div class="page-shell" id="pageCalendar">' +
             '<section class="page-hero">' +
-            '<div><div class="hero-badge"><i class="fas fa-calendar-alt"></i> Calendar</div><h2>Stay ahead of health and breeding schedules</h2><p>Review the next care milestones and important dates at a glance.</p></div>' +
+            '<div><div class="hero-badge"><i class="fas fa-calendar-alt"></i> Calendar</div><h2>Stay ahead of health and breeding schedules</h2><p>Browse the month and see every task and event logged on its exact day.</p></div>' +
             '</section>' +
-            '<div class="section-header"><h2><i class="fas fa-calendar-alt"></i> Upcoming Schedule</h2><div class="section-badge"><i class="fas fa-clock"></i> Due soon</div></div>' +
-            '<div class="card section-card"><div class="card-body">' + upcomingHtml + '</div></div></div>';
+            '<div class="calendar-shell">' +
+            '<div class="card section-card calendar-grid-card">' +
+            '<div class="calendar-nav">' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="App.calendarPrevMonth()"><i class="fas fa-chevron-left"></i></button>' +
+            '<h3 class="calendar-month-label">' + monthNames[viewMonth] + ' ' + viewYear + '</h3>' +
+            '<div style="display:flex;gap:8px">' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="App.calendarGoToday()">Today</button>' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="App.calendarNextMonth()"><i class="fas fa-chevron-right"></i></button>' +
+            '</div></div>' +
+            '<div class="calendar-weekday-row">' + weekdayHeaderHtml + '</div>' +
+            '<div class="calendar-grid">' + cellsHtml + '</div>' +
+            '</div>' +
+            '<div class="card section-card calendar-detail-card">' +
+            '<div class="card-header"><h3><i class="fas fa-calendar-day"></i> ' + selectedLabel + '</h3></div>' +
+            '<div class="card-body">' + detailItemsHtml + addEventFormHtml + '</div>' +
+            '</div>' +
+            '</div></div>';
     },
+
 
     settingsPage: function() {
         var user = KennelData.getCurrentUser();

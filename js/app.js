@@ -18,6 +18,9 @@ const App = {
     chatMessages: [],
     chatLastTimestamp: '',
     chatUnreadCount: 0,
+    calendarViewYear: null,
+    calendarViewMonth: null,
+    calendarSelectedDate: null,
     lastFinanceSnapshot: null,
     _settingsDataLoaded: false,
     editingUserId: null,
@@ -773,6 +776,16 @@ const App = {
                         resetPuppyForm();
                         this.render();
                     });
+                };
+            }
+        }
+
+        if (this.currentPage === 'calendar') {
+            const eventForm = document.getElementById('calendarEventForm');
+            if (eventForm) {
+                eventForm.onsubmit = (e) => {
+                    e.preventDefault();
+                    this.handleAddCalendarEvent();
                 };
             }
         }
@@ -2043,6 +2056,96 @@ const App = {
 
     markCalendarUpcomingDone(dogId, recordType, recordId, dueValue) {
         this.markAlertDone(dogId, recordType, recordId, dueValue);
+    },
+
+    // ===== Calendar (month grid) navigation & custom events =====
+    calendarPrevMonth() {
+        var now = new Date();
+        var year = (typeof this.calendarViewYear === 'number') ? this.calendarViewYear : now.getFullYear();
+        var month = (typeof this.calendarViewMonth === 'number') ? this.calendarViewMonth : now.getMonth();
+        month -= 1;
+        if (month < 0) { month = 11; year -= 1; }
+        this.calendarViewYear = year;
+        this.calendarViewMonth = month;
+        this.render();
+    },
+
+    calendarNextMonth() {
+        var now = new Date();
+        var year = (typeof this.calendarViewYear === 'number') ? this.calendarViewYear : now.getFullYear();
+        var month = (typeof this.calendarViewMonth === 'number') ? this.calendarViewMonth : now.getMonth();
+        month += 1;
+        if (month > 11) { month = 0; year += 1; }
+        this.calendarViewYear = year;
+        this.calendarViewMonth = month;
+        this.render();
+    },
+
+    calendarGoToday() {
+        var now = new Date();
+        this.calendarViewYear = now.getFullYear();
+        this.calendarViewMonth = now.getMonth();
+        this.calendarSelectedDate = Components.formatDateYMD(now);
+        this.render();
+    },
+
+    calendarSelectDate(dateStr) {
+        if (!dateStr) return;
+        this.calendarSelectedDate = dateStr;
+        var parts = dateStr.split('-');
+        if (parts.length === 3) {
+            this.calendarViewYear = parseInt(parts[0], 10);
+            this.calendarViewMonth = parseInt(parts[1], 10) - 1;
+        }
+        this.render();
+    },
+
+    handleAddCalendarEvent() {
+        if (!this._requireEditAccess()) return;
+        const dateInput = document.getElementById('calendarEventDate');
+        const titleInput = document.getElementById('calendarEventTitle');
+        const notesInput = document.getElementById('calendarEventNotes');
+        const dateVal = dateInput ? dateInput.value : this.calendarSelectedDate;
+        const titleVal = titleInput ? titleInput.value.trim() : '';
+
+        if (!dateVal || !titleVal) {
+            Components.toast('Please enter a title for this event.', 'error');
+            return;
+        }
+
+        KennelData.addCalendarEvent({
+            date: dateVal,
+            title: titleVal,
+            notes: notesInput ? notesInput.value.trim() : ''
+        }).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to save event right now.', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Event submitted for admin approval.');
+                return;
+            }
+            Components.toast('Event added to calendar.');
+            this.render();
+        });
+    },
+
+    deleteCalendarEventEntry(id) {
+        if (!this._requireEditAccess()) return;
+        if (!id || !window.confirm('Delete this event?')) return;
+        KennelData.deleteCalendarEvent(id).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast(result && result.error ? result.error : 'Unable to delete event right now.', 'error');
+                return;
+            }
+            if (result.pending) {
+                Components.toast('Event removal submitted for admin approval.');
+                return;
+            }
+            Components.toast('Event removed.');
+            this.render();
+        });
     },
 
     postponeCalendarUpcoming(dogId, recordType, recordId, dueField, currentDueValue) {

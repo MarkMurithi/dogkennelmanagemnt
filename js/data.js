@@ -1538,24 +1538,56 @@ const KennelData = {
         return this._events.filter(function(e) { return e.date.indexOf(prefix) === 0; });
     },
 
+    // Everything scheduled on a given calendar day: health/vaccination/breeding
+    // tasks due that day (from getStats().upcomingEvents) plus any custom
+    // calendar events a user added for that day.
+    getCalendarDayInfo(dateStr) {
+        var stats = this.getStats();
+        var tasks = stats.upcomingEvents.filter(function(e) { return e.nextDue === dateStr; });
+        var events = this.getEventsForDate(dateStr);
+        return { tasks: tasks, events: events };
+    },
+
     addCalendarEvent(event) {
-        event.id = 'ev' + Date.now();
-        this._events.push(event);
-        this._addActivity('event', '<strong>Event:</strong> ' + event.title, 'blue');
-        this._save();
-        this._notify();
-        this._request('/events', {
+        var tempId = 'ev' + Date.now();
+        event.id = tempId;
+        return this._request('/events', {
             method: 'POST',
             body: JSON.stringify(event)
-        }).catch(function() {});
-        return event;
+        }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to save event right now.' };
+            }
+            if (result.pending) {
+                return result;
+            }
+            var created = Object.assign({}, event, result.event || {});
+            created.id = (result.event && result.event.id) || created.id;
+            this._events.push(created);
+            this._addActivity('event', '<strong>Event:</strong> ' + created.title, 'blue');
+            this._save();
+            this._notify();
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to save event right now.' };
+        });
     },
 
     deleteCalendarEvent(id) {
-        this._events = this._events.filter(function(e) { return e.id !== id; });
-        this._save();
-        this._notify();
-        this._request('/events/' + id, { method: 'DELETE' }).catch(function() {});
+        return this._request('/events/' + id, { method: 'DELETE' }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to delete event right now.' };
+            }
+            if (result.pending) {
+                return result;
+            }
+            this._events = this._events.filter(function(e) { return e.id !== id; });
+            this._save();
+            this._notify();
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to delete event right now.' };
+        });
     },
 
     getAlerts() {
