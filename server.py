@@ -26,6 +26,8 @@ AUTH_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("AUTH_RATE_LIMIT_WINDOW_SECO
 AUTH_RATE_LIMIT_MAX_ATTEMPTS = int(os.environ.get("AUTH_RATE_LIMIT_MAX_ATTEMPTS", "8"))
 AUTH_RATE_LIMIT_BLOCK_SECONDS = int(os.environ.get("AUTH_RATE_LIMIT_BLOCK_SECONDS", "600"))
 
+MAX_USERS = int(os.environ.get("MAX_USERS", "20"))
+
 FAILED_AUTH_ATTEMPTS = {}
 FAILED_AUTH_ATTEMPTS_LOCK = threading.Lock()
 
@@ -1416,7 +1418,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             rows = self._fetch_all("SELECT id, name, email, role, active, createdAt FROM users ORDER BY createdAt DESC")
             payload = [{"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]} for row in rows]
-            self._send_json(200, payload)
+            self._send_json(200, {"users": payload, "maxUsers": MAX_USERS})
             return
 
         if path == "/api/users" and method == "POST":
@@ -1441,6 +1443,11 @@ class KennelHandler(BaseHTTPRequestHandler):
                     return
             conn = self._connect()
             try:
+                current_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                if current_count >= MAX_USERS:
+                    conn.close()
+                    self._send_json(400, {"ok": False, "error": f"User limit reached. The maximum of {MAX_USERS} accounts is already in use. Contact the administrator."})
+                    return
                 user_id = "u" + str(int(__import__("time").time() * 1000))
                 conn.execute(
                     "INSERT INTO users (id, name, email, password, role, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -1567,6 +1574,12 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             conn = self._connect()
             try:
+                current_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                if current_count >= MAX_USERS:
+                    conn.close()
+                    self._record_auth_failure(signup_rate_key)
+                    self._send_json(400, {"ok": False, "error": f"Signups are currently closed. The maximum of {MAX_USERS} accounts has been reached."})
+                    return
                 user_id = "u" + str(int(__import__("time").time() * 1000))
                 conn.execute(
                     "INSERT INTO users (id, name, email, password, role, createdAt) VALUES (?, ?, ?, ?, ?, ?)",

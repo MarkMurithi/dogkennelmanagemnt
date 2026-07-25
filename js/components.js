@@ -1021,12 +1021,16 @@ const Components = {
 
         var editingUserId = (typeof App !== 'undefined') ? App.editingUserId : null;
 
+        var maxUsers = KennelData.getMaxUsers();
+        var userCount = users.length;
+
         if (!users.length) {
             userRows = '<p style="color:var(--gray-400)">No users yet.</p>';
         } else {
             for (var i = 0; i < users.length; i++) {
                 var item = users[i];
                 var safe = this.escapeHtml.bind(this);
+                var isCurrentUser = KennelData.getCurrentUser() && KennelData.getCurrentUser().id === item.id;
                 if (editingUserId === item.id) {
                     // Inline edit form
                     userRows += '<div class="card section-card" style="margin-bottom:10px">' +
@@ -1054,13 +1058,14 @@ const Components = {
                 } else {
                     userRows += '<div class="card section-card" style="margin-bottom:10px">' +
                         '<div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
-                        '<div><strong>' + safe(item.name || 'Unnamed user') + '</strong><br>' +
+                        '<div><strong>' + safe(item.name || 'Unnamed user') + '</strong>' + (isCurrentUser ? ' <span class="status-pill active" style="font-size:0.68rem">You</span>' : '') + '<br>' +
                         '<span style="color:var(--gray-500);font-size:0.9rem">' + safe(item.email || '') + ' &bull; ' + safe(item.role || 'staff') + '</span></div>' +
                         '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
                         (item.active === false ? '<span class="status-pill">Disabled</span>' : '<span class="status-pill active">Active</span>') +
                         (editingUserId !== item.id && KennelData.getCurrentUserRole() !== 'reviewer'
                             ? '<button class="btn btn-sm btn-secondary" onclick="App.toggleUserActive(\'' + item.id + '\')">' + (item.active === false ? 'Enable' : 'Disable') + '</button>' +
-                              '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')"><i class="fas fa-edit"></i> Edit</button>'
+                              '<button class="btn btn-sm btn-secondary" onclick="App.editUser(\'' + item.id + '\')"><i class="fas fa-edit"></i> Edit</button>' +
+                              (!isCurrentUser ? '<button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.25)" onclick="App.deleteUser(\'' + item.id + '\')"><i class="fas fa-trash"></i> Delete</button>' : '')
                             : '') +
                         '</div></div></div>';
                 }
@@ -1110,7 +1115,7 @@ const Components = {
             : '';
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3>' + pendingBadgeHtml + '</div><div class="card-body">' + pendingRows + '</div></div>';
 
-        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
+        summaryCards += '<div class="card section-card"><div class="card-header" style="flex-wrap:wrap;gap:8px"><h3><i class="fas fa-users"></i> User management</h3><span style="font-size:0.82rem;color:var(--gray-500)">' + userCount + ' / ' + maxUsers + ' accounts</span></div><div class="card-body">' +
             (role !== 'reviewer'
                 ? '<div style="background:rgba(200,169,81,0.1);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.83rem;color:var(--gray-600)"><i class="fas fa-info-circle" style="color:var(--primary-dark)"></i> All self-registered accounts are <strong>Staff</strong> by default. Use the Edit button to grant a user <strong>Reviewer</strong> access. Only the super admin can assign the <strong>Admin</strong> role.</div>' +
                   '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +

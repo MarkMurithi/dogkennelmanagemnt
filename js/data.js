@@ -11,6 +11,7 @@ const KennelData = {
     _mySubmissions: [],
     _submissionStatusCache: {},
     _currentUser: null,
+    _maxUsers: 20,
     _serverState: { status: 'online', message: '' },
     _listeners: [],
     _pendingWrites: [],
@@ -994,16 +995,25 @@ const KennelData = {
 
     loadUsers() {
         return this._request('/users').then(function(result) {
-            if (Array.isArray(result)) {
-                this._users = result;
+            // Handle new format {users: [...], maxUsers: N} as well as plain array
+            var list = Array.isArray(result) ? result : (result && Array.isArray(result.users) ? result.users : null);
+            if (list) {
+                this._users = list;
+                if (result && result.maxUsers) {
+                    this._maxUsers = result.maxUsers;
+                }
                 this._save();
                 this._notify();
-                return result;
+                return list;
             }
             return [];
         }.bind(this)).catch(function() {
             return [];
         });
+    },
+
+    getMaxUsers() {
+        return this._maxUsers || 20;
     },
 
     createUser(details) {
