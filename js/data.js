@@ -1475,6 +1475,36 @@ const KennelData = {
         return entries;
     },
 
+    // Collapses a dog's daily health-status history down to a single "current" status:
+    // - A report with health "Good" always overwrites whatever was current before it.
+    // - A report with any other health value (e.g. "Needs Watch") becomes the current
+    //   status and stays pinned/highlighted, ignoring later non-"Good" reports, until a
+    //   future report with health "Good" comes in and overwrites it.
+    getDogCurrentHealthStatus(dogId, dogName) {
+        var entries = this.getDogDailyHealthStatuses(dogId, dogName);
+        var chronological = entries.slice().reverse();
+        var current = null;
+
+        for (var i = 0; i < chronological.length; i++) {
+            var entry = chronological[i];
+            if (!entry.healthStatus) continue;
+
+            var isGood = entry.healthStatus === 'Good';
+            var currentIsGoodOrEmpty = !current || current.healthStatus === 'Good';
+
+            if (isGood || currentIsGoodOrEmpty) {
+                current = entry;
+            }
+            // else: current is a "Needs Watch" style status and this entry isn't "Good" —
+            // keep the existing pinned status until a "Good" report overwrites it.
+        }
+
+        return {
+            entry: current,
+            needsWatch: !!(current && current.healthStatus && current.healthStatus !== 'Good')
+        };
+    },
+
     addDailyReport(report) {
         const entry = Object.assign({ id: 'dr' + Date.now(), createdAt: new Date().toISOString() }, report);
         return this._request('/daily-reports', {

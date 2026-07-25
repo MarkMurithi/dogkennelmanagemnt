@@ -246,6 +246,7 @@ const Components = {
     dailyHealthStatusList: function(dog) {
         var safe = this.escapeHtml.bind(this);
         var entries = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
+        var current = KennelData.getDogCurrentHealthStatus(dog.id, dog.name);
         var addButton = '<div style="margin-bottom:12px">' +
             '<button class="btn btn-primary btn-sm" onclick="App.openDailyReportForDog(\'' + dog.id + '\')">' +
             '<i class="fas fa-plus"></i> Add Health Status' +
@@ -258,9 +259,30 @@ const Components = {
                 '</div>';
         }
 
+        // The current health status is pinned at the top (highlighted when "Needs Watch")
+        // and stays there — overwritten only once a later report logs health as "Good" —
+        // instead of every day's report piling up as its own separate entry.
+        var pinnedHtml = '';
+        if (current.entry) {
+            var pinnedDateText = current.entry.reportDate ? new Date(current.entry.reportDate).toLocaleDateString() : 'Date unknown';
+            var pinnedMeta = [];
+            if (current.entry.groomingStatus) pinnedMeta.push('Grooming: ' + current.entry.groomingStatus);
+            if (current.entry.medication) pinnedMeta.push('Medication: ' + current.entry.medication);
+            if (current.entry.personInCharge) pinnedMeta.push('By: ' + current.entry.personInCharge);
+            pinnedHtml = '<div class="record-item health' + (current.needsWatch ? ' health-alert' : '') + '">' +
+                '<div class="record-info">' +
+                '<h4>' + safe(current.entry.healthStatus || 'Status not set') + (current.needsWatch ? ' <span class="health-alert-badge"><i class="fas fa-exclamation-triangle"></i> Needs watch</span>' : '') + '</h4>' +
+                '<p>' + safe(pinnedDateText + (pinnedMeta.length ? ' • ' + pinnedMeta.join(' • ') : '')) + '</p>' +
+                '</div>' +
+                '</div>';
+        }
+
         var items = '';
         for (var i = 0; i < entries.length; i++) {
             var entry = entries[i];
+            if (current.entry && entry.reportId === current.entry.reportId && entry.healthStatus === current.entry.healthStatus) {
+                continue;
+            }
             var dateText = entry.reportDate ? new Date(entry.reportDate).toLocaleDateString() : 'Date unknown';
             var meta = [];
             if (entry.groomingStatus) meta.push('Grooming: ' + entry.groomingStatus);
@@ -274,7 +296,7 @@ const Components = {
                 '</div>';
         }
 
-        return addButton + '<div class="records-list">' + items + '</div>';
+        return addButton + pinnedHtml + '<div class="records-list">' + items + '</div>';
     },
 
     dogDetailPanel: function(dog) {
@@ -940,6 +962,7 @@ const Components = {
             var dog = dogs[i];
             var healthRecords = (dog.records && dog.records.health) || [];
             var dailyStatuses = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
+            var currentHealthStatus = KennelData.getDogCurrentHealthStatus(dog.id, dog.name);
             var entries = [];
             var recordsHtml = '';
 
@@ -951,10 +974,14 @@ const Components = {
                     details: (record.vet ? 'Vet: ' + record.vet + ' • ' : '') + (record.notes || 'No notes')
                 });
             }
+            // Daily reports that include a health status are collapsed into a single
+            // "current status" entry below (a later "Good" report overwrites it, while a
+            // "Needs Watch" report stays pinned until a "Good" report comes in). Reports
+            // that only log grooming/medication (no health status) are listed as-is.
             for (var k = 0; k < dailyStatuses.length; k++) {
                 var status = dailyStatuses[k];
+                if (status.healthStatus) continue;
                 var details = [];
-                if (status.healthStatus) details.push('Health: ' + status.healthStatus);
                 if (status.groomingStatus) details.push('Grooming: ' + status.groomingStatus);
                 if (status.medication) details.push('Medication: ' + status.medication);
                 if (status.personInCharge) details.push('By: ' + status.personInCharge);
@@ -964,16 +991,35 @@ const Components = {
                     details: details.join(' • ') || 'No details logged'
                 });
             }
+            if (currentHealthStatus.entry) {
+                var curStatus = currentHealthStatus.entry;
+                var curDetails = ['Health: ' + curStatus.healthStatus];
+                if (curStatus.groomingStatus) curDetails.push('Grooming: ' + curStatus.groomingStatus);
+                if (curStatus.medication) curDetails.push('Medication: ' + curStatus.medication);
+                if (curStatus.personInCharge) curDetails.push('By: ' + curStatus.personInCharge);
+                entries.push({
+                    date: curStatus.reportDate || curStatus.createdAt || '',
+                    title: 'Current health status',
+                    details: curDetails.join(' • '),
+                    pinned: true,
+                    alert: currentHealthStatus.needsWatch
+                });
+            }
 
-            entries.sort(function(a, b) { return new Date(b.date || 0) - new Date(a.date || 0); });
+            entries.sort(function(a, b) {
+                if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                return new Date(b.date || 0) - new Date(a.date || 0);
+            });
             if (entries.length === 0) {
                 recordsHtml = '<p style="color:var(--gray-400)">No health records yet.</p>';
             } else {
                 for (var m = 0; m < entries.length; m++) {
                     var entry = entries[m];
-                    recordsHtml += '<div class="alert-item" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                    var entryClass = 'alert-item' + (entry.alert ? ' health-alert-pinned' : '');
+                    var alertBadge = entry.alert ? ' <span class="health-alert-badge"><i class="fas fa-exclamation-triangle"></i> Needs watch</span>' : '';
+                    recordsHtml += '<div class="' + entryClass + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
                         '<div class="alert-content">' +
-                        '<h4>' + entry.title + '</h4>' +
+                        '<h4>' + entry.title + alertBadge + '</h4>' +
                         '<p>' + entry.details + '</p>' +
                         '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
                         '</div></div>';

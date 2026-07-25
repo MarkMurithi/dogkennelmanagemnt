@@ -1100,6 +1100,32 @@ body.modal-open {
 .record-item.heat-cycle { border-left-color: #f472b6; }
 .record-item.training { border-left-color: #8b5cf6; }
 
+/* Pinned "Needs Watch" health status — stays highlighted at the top of the list
+   until a later report overwrites it with a "Good" status. */
+.record-item.health-alert {
+    border-left-color: var(--danger);
+    background: #fff1f2;
+}
+
+.health-alert-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #fff;
+    background: var(--danger);
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.alert-item.health-alert-pinned {
+    border-left-color: var(--danger);
+    background: #fff1f2;
+}
+
 .record-info { flex: 1; min-width: 0; overflow: hidden; }
 .record-info h4 { font-size: 0.8rem; font-weight: 600; color: var(--gray-800); margin: 0; }
 .record-info p { font-size: 0.74rem; color: var(--gray-500); margin-top: 2px; word-break: break-word; line-height: 1.3; }
