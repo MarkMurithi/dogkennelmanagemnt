@@ -1573,15 +1573,30 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return
             since = self.path.split("since=")[-1] if "since=" in self.path else ""
             conn = self._connect()
-            if since:
-                rows = conn.execute(
-                    "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? ORDER BY createdAt ASC LIMIT 100",
-                    (since,)
-                ).fetchall()
+            is_admin = user.get("role") == "admin"
+            if is_admin:
+                # Admins can see every conversation in the chat.
+                if since:
+                    rows = conn.execute(
+                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? ORDER BY createdAt ASC LIMIT 100",
+                        (since,)
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages ORDER BY createdAt ASC LIMIT 100"
+                    ).fetchall()
             else:
-                rows = conn.execute(
-                    "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages ORDER BY createdAt ASC LIMIT 100"
-                ).fetchall()
+                # Reviewers/staff only see their own messages plus messages from admins.
+                if since:
+                    rows = conn.execute(
+                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE createdAt > ? AND (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
+                        (since, user["id"])
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT id, userId, userName, userRole, content, createdAt FROM chat_messages WHERE (userId = ? OR userRole = 'admin') ORDER BY createdAt ASC LIMIT 100",
+                        (user["id"],)
+                    ).fetchall()
             conn.close()
             messages = [{"id": r[0], "userId": r[1], "userName": r[2], "userRole": r[3], "content": r[4], "createdAt": r[5]} for r in rows]
             self._send_json(200, {"ok": True, "messages": messages})
