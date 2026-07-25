@@ -21,6 +21,7 @@ const Components = {
             '<button class="btn btn-primary" style="width:100%" type="submit"><i class="fas fa-sign-in-alt"></i> Sign in</button>' +
             '</form>' +
             '<form id="signupForm" class="auth-form">' +
+            '<div style="background:rgba(200,169,81,0.12);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.82rem;color:var(--gray-600)"><i class="fas fa-info-circle" style="color:var(--primary-dark)"></i> All new accounts are created as <strong>Staff</strong>. Only an admin can upgrade your role.</div>' +
             '<div class="form-group"><label for="signupName">Full name</label><input type="text" id="signupName" placeholder="Your full name" required></div>' +
             '<div class="form-group"><label for="signupEmail">Email</label><input type="email" id="signupEmail" placeholder="you@example.com" required></div>' +
             '<div class="form-group"><label for="signupPassword">Password</label><input type="password" id="signupPassword" placeholder="Create a password" required></div>' +
@@ -1106,7 +1107,8 @@ const Components = {
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-users"></i> User management</h3></div><div class="card-body">' +
             (role !== 'reviewer'
-                ? '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
+                ? '<div style="background:rgba(200,169,81,0.1);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.83rem;color:var(--gray-600)"><i class="fas fa-info-circle" style="color:var(--primary-dark)"></i> All self-registered accounts are <strong>Staff</strong> by default. Use the Edit button to grant a user <strong>Reviewer</strong> access. Only the super admin can assign the <strong>Admin</strong> role.</div>' +
+                  '<form id="createUserForm" class="modern-form" autocomplete="off" onsubmit="App.handleCreateUser(event)">' +
                   '<div class="form-row">' +
                   '<div class="form-group half"><label>Name</label><input type="text" id="newUserName" name="newUserName" autocomplete="off" autocapitalize="none" spellcheck="false" required></div>' +
                   '<div class="form-group half"><label>Email</label><input type="email" id="newUserEmail" name="newUserEmail" autocomplete="email" required></div>' +
