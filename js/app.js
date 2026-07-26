@@ -525,11 +525,34 @@ const App = {
                         Components.toast('Please add at least one status detail.', 'error');
                         return;
                     }
-                    dogStatuses.push({ dogId: dogSelect.value, dogName: label, healthStatus: healthValue, groomingStatus: groomingValue, medication: medicationValue });
+                    const dogIdValue = dogSelect.value;
+                    const personInChargeEl = document.getElementById('dailyReportPersonInCharge');
+                    const personInChargeValue = personInChargeEl ? personInChargeEl.value.trim() : '';
+                    dogStatuses.push({ dogId: dogIdValue, dogName: label, healthStatus: healthValue, groomingStatus: groomingValue, medication: medicationValue });
                     dogHealth.value = '';
                     dogGrooming.value = '';
                     if (dogMedication) dogMedication.value = '';
                     renderStatusList();
+
+                    // Save this status update immediately so it shows up right away on
+                    // the Health Records page and this dog's profile, instead of waiting
+                    // for the full Daily Report below to be saved. If a Daily Report is
+                    // later submitted with an entry for this dog, its later timestamp
+                    // naturally takes over as the current status.
+                    KennelData.addDogStatusUpdate({
+                        dogId: dogIdValue,
+                        dogName: label,
+                        healthStatus: healthValue,
+                        groomingStatus: groomingValue,
+                        medication: medicationValue,
+                        personInCharge: personInChargeValue
+                    }).then((result) => {
+                        if (!result || !result.ok) {
+                            Components.toast((result && result.error) || 'Added to report, but the live health status update failed to save.', 'error');
+                            return;
+                        }
+                        Components.toast(label + '\u2019s health status updated');
+                    });
                 });
             }
 

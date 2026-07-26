@@ -233,6 +233,21 @@ def init_db():
             raise
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS dog_status_updates (
+            id TEXT PRIMARY KEY,
+            dogId TEXT,
+            dogName TEXT,
+            healthStatus TEXT,
+            groomingStatus TEXT,
+            medication TEXT,
+            personInCharge TEXT,
+            createdAt TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS activities (
             id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
@@ -2252,6 +2267,62 @@ class KennelHandler(BaseHTTPRequestHandler):
                 "staffComments": payload.get("staffComments", ""),
                 "notes": payload.get("notes", ""),
                 "createdAt": self._now(),
+            }})
+            return
+
+        if path == "/api/dog-status-updates" and method == "GET":
+            user = self._require_auth()
+            if not user:
+                return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
+                return
+            rows = self._fetch_all(
+                "SELECT id, dogId, dogName, healthStatus, groomingStatus, medication, personInCharge, createdAt FROM dog_status_updates ORDER BY createdAt DESC LIMIT 500"
+            )
+            payload = [
+                {"id": row[0], "dogId": row[1], "dogName": row[2], "healthStatus": row[3], "groomingStatus": row[4], "medication": row[5], "personInCharge": row[6], "createdAt": row[7]}
+                for row in rows
+            ]
+            self._send_json(200, payload)
+            return
+
+        if path == "/api/dog-status-updates" and method == "POST":
+            user = self._require_auth()
+            if not self._require_role(user, {"admin", "staff"}):
+                return
+            payload = self._parse_json(body)
+            dog_id = str(payload.get("dogId", "")).strip()
+            if not dog_id:
+                self._send_json(400, {"ok": False, "error": "A dog is required."})
+                return
+            health_status = str(payload.get("healthStatus", "")).strip()
+            grooming_status = str(payload.get("groomingStatus", "")).strip()
+            medication = str(payload.get("medication", "")).strip()
+            if not health_status and not grooming_status and not medication:
+                self._send_json(400, {"ok": False, "error": "Please add at least one status detail."})
+                return
+            dog_name = str(payload.get("dogName", "")).strip()
+            person_in_charge = str(payload.get("personInCharge", "")).strip() or user.get("name", "")
+            update_id = "dsu" + str(int(__import__("time").time() * 1000))
+            created_at = self._now()
+            conn = self._connect()
+            conn.execute(
+                "INSERT INTO dog_status_updates (id, dogId, dogName, healthStatus, groomingStatus, medication, personInCharge, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (update_id, dog_id, dog_name, health_status, grooming_status, medication, person_in_charge, created_at),
+            )
+            conn.commit()
+            conn.close()
+            self._log_audit(user, "add_dog_status_update", dog_id, f"Logged quick health status for dog {dog_id}")
+            self._send_json(200, {"ok": True, "update": {
+                "id": update_id,
+                "dogId": dog_id,
+                "dogName": dog_name,
+                "healthStatus": health_status,
+                "groomingStatus": grooming_status,
+                "medication": medication,
+                "personInCharge": person_in_charge,
+                "createdAt": created_at,
             }})
             return
 

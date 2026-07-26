@@ -13,11 +13,12 @@ const KennelData = {
     _currentUser: null,
     _maxUsers: 20,
     _dataHidden: false,
+    _dogStatusUpdates: [],
     _serverState: { status: 'online', message: '' },
     _listeners: [],
     _pendingWrites: [],
     _isFlushingPendingWrites: false,
-    _DATA_VERSION: 13,
+    _DATA_VERSION: 14,
     apiBase: (function() {
         if (typeof window === 'undefined' || !window.location) {
             return 'http://127.0.0.1:8001/api';
@@ -45,7 +46,7 @@ const KennelData = {
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                if (parsed._version === this._DATA_VERSION || parsed._version === 12 || parsed._version === 10 || parsed._version === 9) {
+                if (parsed._version === this._DATA_VERSION || parsed._version === 13 || parsed._version === 12 || parsed._version === 10 || parsed._version === 9) {
                     this._dogs = parsed.dogs || [];
                     this._puppies = parsed.puppies || [];
                     this._activities = parsed.activities || [];
@@ -55,6 +56,7 @@ const KennelData = {
                     this._users = Array.isArray(parsed.users) ? parsed.users : [];
                     this._pendingApprovals = Array.isArray(parsed.pendingApprovals) ? parsed.pendingApprovals : [];
                     this._mySubmissions = Array.isArray(parsed.mySubmissions) ? parsed.mySubmissions : [];
+                    this._dogStatusUpdates = Array.isArray(parsed.dogStatusUpdates) ? parsed.dogStatusUpdates : [];
                     this._currentUser = parsed.currentUser || this._restoreAuthState();
                 } else {
                     this._resetEmptyState();
@@ -352,6 +354,7 @@ const KennelData = {
             this._syncCollection('/daily-reports', '_dailyReports'),
             this._syncCollection('/activities', '_activities'),
             this._syncCollection('/my-submissions', '_mySubmissions'),
+            this._syncCollection('/dog-status-updates', '_dogStatusUpdates'),
             this.fetchDataVisibility()
         ];
         return Promise.all(requests).then(function(changedFlags) {
@@ -399,6 +402,31 @@ const KennelData = {
         });
     },
 
+    // Immediately persists a single dog's quick health/grooming/medication status
+    // update (e.g. from the "Add Health Status" flow on a dog's profile) so it shows
+    // up right away on the Health Records page and that dog's profile, without
+    // waiting for a full Daily Report to be submitted. If a full Daily Report is
+    // later saved with an entry for the same dog, its later timestamp naturally
+    // supersedes this quick entry once merged in getDogDailyHealthStatuses().
+    addDogStatusUpdate(entry) {
+        return this._request('/dog-status-updates', {
+            method: 'POST',
+            body: JSON.stringify(entry || {})
+        }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to save health status right now.' };
+            }
+            if (result.update) {
+                this._dogStatusUpdates.unshift(result.update);
+                this._save();
+                this._notify();
+            }
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to save health status right now.' };
+        });
+    },
+
     _resetEmptyState() {
         this._dogs = [];
         this._puppies = [];
@@ -409,6 +437,7 @@ const KennelData = {
         this._users = [];
         this._pendingApprovals = [];
         this._mySubmissions = [];
+        this._dogStatusUpdates = [];
         this._submissionStatusCache = {};
         this._currentUser = null;
         this._save();
@@ -426,6 +455,7 @@ const KennelData = {
             users: this._users,
             pendingApprovals: this._pendingApprovals,
             mySubmissions: this._mySubmissions,
+            dogStatusUpdates: this._dogStatusUpdates,
             currentUser: this._currentUser
         }));
     },
@@ -1477,6 +1507,14 @@ const KennelData = {
         return this._dailyReports.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
     },
 
+    // Combines two sources of a dog's health/grooming status history:
+    // 1. Entries derived from submitted Daily Reports' dogStatuses (as before).
+    // 2. Standalone "quick" status updates (from the dog profile's "Add Health
+    //    Status" flow) which are saved immediately without needing a full Daily
+    //    Report submission.
+    // Both are merged and sorted chronologically so getDogCurrentHealthStatus's
+    // pinning logic naturally lets whichever is most recent (quick update or a
+    // later submitted Daily Report) become the current status.
     getDogDailyHealthStatuses(dogId, dogName) {
         var reports = this.getDailyReports();
         var normalizedName = (dogName || '').toLowerCase().trim();
@@ -1506,6 +1544,29 @@ const KennelData = {
                     notes: report.notes || ''
                 });
             }
+        }
+
+        var quickUpdates = this._dogStatusUpdates || [];
+        for (var q = 0; q < quickUpdates.length; q++) {
+            var update = quickUpdates[q] || {};
+            var updateName = (update.dogName || '').toLowerCase().trim();
+            var updateMatchesId = update.dogId && dogId && update.dogId === dogId;
+            var updateMatchesName = normalizedName && updateName && updateName === normalizedName;
+
+            if (!updateMatchesId && !updateMatchesName) {
+                continue;
+            }
+
+            entries.push({
+                reportId: '',
+                reportDate: update.createdAt || '',
+                createdAt: update.createdAt || '',
+                personInCharge: update.personInCharge || '',
+                healthStatus: update.healthStatus || '',
+                groomingStatus: update.groomingStatus || '',
+                medication: update.medication || '',
+                notes: ''
+            });
         }
 
         entries.sort(function(a, b) {
