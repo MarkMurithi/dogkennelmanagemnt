@@ -963,7 +963,7 @@ const Components = {
 
     healthRecordsPage: function() {
         var dogs = KennelData.getDogs().filter(function(dog) { return dog.status === 'Active'; });
-        var cardsHtml = '';
+        var dogCards = [];
 
         for (var i = 0; i < dogs.length; i++) {
             var dog = dogs[i];
@@ -972,6 +972,7 @@ const Components = {
             var currentHealthStatus = KennelData.getDogCurrentHealthStatus(dog.id, dog.name);
             var entries = [];
             var recordsHtml = '';
+            var latestTimestamp = 0;
 
             for (var j = 0; j < healthRecords.length; j++) {
                 var record = healthRecords[j];
@@ -1013,6 +1014,11 @@ const Components = {
                 });
             }
 
+            for (var e = 0; e < entries.length; e++) {
+                var entryTime = entries[e].date ? new Date(entries[e].date).getTime() : 0;
+                if (!isNaN(entryTime) && entryTime > latestTimestamp) latestTimestamp = entryTime;
+            }
+
             entries.sort(function(a, b) {
                 if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
                 return new Date(b.date || 0) - new Date(a.date || 0);
@@ -1033,8 +1039,13 @@ const Components = {
                 }
             }
 
-            cardsHtml += '<div class="card section-card clickable-card" onclick="App.openDogHealthRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s full medical &amp; care records"><div class="card-header"><h3><i class="fas fa-heartbeat"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>';
+            var cardHtml = '<div class="card section-card clickable-card" onclick="App.openDogHealthRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s full medical &amp; care records"><div class="card-header"><h3><i class="fas fa-heartbeat"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>';
+            dogCards.push({ latestTimestamp: latestTimestamp, html: cardHtml });
         }
+
+        // Show the dog with the most recently updated health record first.
+        dogCards.sort(function(a, b) { return b.latestTimestamp - a.latestTimestamp; });
+        var cardsHtml = dogCards.map(function(item) { return item.html; }).join('');
 
         if (!cardsHtml) {
             cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-heartbeat" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No active dogs found</p></div>';
