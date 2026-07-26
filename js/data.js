@@ -408,6 +408,12 @@ const KennelData = {
     // waiting for a full Daily Report to be submitted. If a full Daily Report is
     // later saved with an entry for the same dog, its later timestamp naturally
     // supersedes this quick entry once merged in getDogDailyHealthStatuses().
+    // Note: this deliberately does NOT call _notify() — this is triggered from the
+    // middle of filling out the Daily Report form's "Dog status checklist", and a
+    // reactive full-page re-render at that point would wipe out the rest of the
+    // in-progress, not-yet-saved Daily Report fields above it. The cache is still
+    // saved via _save(), so Health Records / a dog's profile will show it as soon
+    // as those pages are next rendered.
     addDogStatusUpdate(entry) {
         return this._request('/dog-status-updates', {
             method: 'POST',
@@ -419,7 +425,6 @@ const KennelData = {
             if (result.update) {
                 this._dogStatusUpdates.unshift(result.update);
                 this._save();
-                this._notify();
             }
             return result;
         }.bind(this)).catch(function() {
