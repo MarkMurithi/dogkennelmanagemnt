@@ -551,6 +551,10 @@ const App = {
                             Components.toast((result && result.error) || 'Added to report, but the live health status update failed to save.', 'error');
                             return;
                         }
+                        if (result.pending) {
+                            Components.toast(result.message || (label + '\u2019s health status submitted for admin approval.'));
+                            return;
+                        }
                         Components.toast(label + '\u2019s health status updated');
                     });
                 });

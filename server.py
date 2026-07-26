@@ -733,6 +733,8 @@ class KennelHandler(BaseHTTPRequestHandler):
                 return self._delete_event_record(target_id)
         if entity_type == "daily_report" and action == "create":
             return self._insert_daily_report_record(entity_payload)
+        if entity_type == "dog_status_update" and action == "create":
+            return self._insert_dog_status_update_record(entity_payload)
         if entity_type == "activity" and action == "create":
             return self._insert_activity_record(entity_payload)
         return None
@@ -1103,6 +1105,37 @@ class KennelHandler(BaseHTTPRequestHandler):
             "staffComments": payload.get("staffComments", ""),
             "notes": payload.get("notes", ""),
             "createdAt": self._now(),
+        }
+
+    def _insert_dog_status_update_record(self, payload):
+        dog_id = str(payload.get("dogId", "")).strip()
+        if not dog_id:
+            raise ValueError("A dog is required.")
+        health_status = str(payload.get("healthStatus", "")).strip()
+        grooming_status = str(payload.get("groomingStatus", "")).strip()
+        medication = str(payload.get("medication", "")).strip()
+        if not health_status and not grooming_status and not medication:
+            raise ValueError("Please add at least one status detail.")
+        dog_name = str(payload.get("dogName", "")).strip()
+        person_in_charge = str(payload.get("personInCharge", "")).strip()
+        update_id = payload.get("id") or "dsu" + str(int(__import__("time").time() * 1000))
+        created_at = self._now()
+        conn = self._connect()
+        conn.execute(
+            "INSERT INTO dog_status_updates (id, dogId, dogName, healthStatus, groomingStatus, medication, personInCharge, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (update_id, dog_id, dog_name, health_status, grooming_status, medication, person_in_charge, created_at),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "id": update_id,
+            "dogId": dog_id,
+            "dogName": dog_name,
+            "healthStatus": health_status,
+            "groomingStatus": grooming_status,
+            "medication": medication,
+            "personInCharge": person_in_charge,
+            "createdAt": created_at,
         }
 
     def _insert_activity_record(self, payload):
@@ -2299,38 +2332,27 @@ class KennelHandler(BaseHTTPRequestHandler):
             if not self._require_role(user, {"admin", "staff"}):
                 return
             payload = self._parse_json(body)
-            dog_id = str(payload.get("dogId", "")).strip()
-            if not dog_id:
-                self._send_json(400, {"ok": False, "error": "A dog is required."})
+            if user.get("role") == "staff":
+                dog_name_preview = str(payload.get("dogName", "")).strip()
+                if not payload.get("personInCharge"):
+                    payload["personInCharge"] = user.get("name", "")
+                queued = self._queue_staff_submission(
+                    user,
+                    "dog_status_update",
+                    "create",
+                    payload,
+                    summary={"name": dog_name_preview or "Dog status update", "dogId": payload.get("dogId", "")},
+                )
+                self._log_audit(user, "submit_pending_dog_status_update", queued.get("approvalId"), f"Submitted health status update for approval: {dog_name_preview}")
+                self._send_json(200, queued)
                 return
-            health_status = str(payload.get("healthStatus", "")).strip()
-            grooming_status = str(payload.get("groomingStatus", "")).strip()
-            medication = str(payload.get("medication", "")).strip()
-            if not health_status and not grooming_status and not medication:
-                self._send_json(400, {"ok": False, "error": "Please add at least one status detail."})
+            try:
+                created = self._insert_dog_status_update_record(payload)
+            except ValueError as exc:
+                self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            dog_name = str(payload.get("dogName", "")).strip()
-            person_in_charge = str(payload.get("personInCharge", "")).strip() or user.get("name", "")
-            update_id = "dsu" + str(int(__import__("time").time() * 1000))
-            created_at = self._now()
-            conn = self._connect()
-            conn.execute(
-                "INSERT INTO dog_status_updates (id, dogId, dogName, healthStatus, groomingStatus, medication, personInCharge, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (update_id, dog_id, dog_name, health_status, grooming_status, medication, person_in_charge, created_at),
-            )
-            conn.commit()
-            conn.close()
-            self._log_audit(user, "add_dog_status_update", dog_id, f"Logged quick health status for dog {dog_id}")
-            self._send_json(200, {"ok": True, "update": {
-                "id": update_id,
-                "dogId": dog_id,
-                "dogName": dog_name,
-                "healthStatus": health_status,
-                "groomingStatus": grooming_status,
-                "medication": medication,
-                "personInCharge": person_in_charge,
-                "createdAt": created_at,
-            }})
+            self._log_audit(user, "add_dog_status_update", created.get("dogId"), f"Logged quick health status for dog {created.get('dogId')}")
+            self._send_json(200, {"ok": True, "update": created})
             return
 
         if path == "/api/events" and method == "POST":
