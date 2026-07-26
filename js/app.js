@@ -1229,7 +1229,19 @@ const App = {
     },
 
     // ===== Render =====
-    render() {
+    render(options) {
+        const isBackgroundRender = !!(options && options.background);
+        // A background render (triggered reactively by KennelData._notify(), e.g. from
+        // the periodic background data-sync poll picking up an unrelated change such
+        // as a new activity/audit-log entry) must not destructively rebuild the Daily
+        // Report "New report" form while it's open — that form has no live external
+        // data of its own, and regenerating it wipes out anything the user has typed
+        // or staged that hasn't been saved yet. An explicit this.render() call (e.g.
+        // right after a successful Save) is never a background render, so it still
+        // refreshes this page normally (showing the newly saved report, reset form, etc).
+        if (isBackgroundRender && this.currentPage === 'dailyreport' && this._lastRenderedPage === 'dailyreport' && document.getElementById('dailyReportForm')) {
+            return;
+        }
         const main = document.getElementById('mainContent');
         const authScreen = document.getElementById('authScreen');
         const serverState = KennelData.getServerState();
@@ -1364,14 +1376,16 @@ const App = {
 
     // Coalesces multiple render() triggers that happen close together (e.g. several
     // data-change notifications firing in the same tick) into a single rebuild on
-    // the next animation frame, avoiding redundant full-page rebuilds.
+    // the next animation frame, avoiding redundant full-page rebuilds. Marked as a
+    // "background" render since it's driven by a KennelData notify (e.g. background
+    // data-sync polling), not by the user explicitly navigating or saving something.
     _scheduleRender() {
         if (this._renderScheduled) return;
         this._renderScheduled = true;
         const raf = window.requestAnimationFrame || function(cb) { return window.setTimeout(cb, 16); };
         raf(() => {
             this._renderScheduled = false;
-            this.render();
+            this.render({ background: true });
         });
     },
 
