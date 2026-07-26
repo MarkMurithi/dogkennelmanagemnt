@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bigpaw Kennel - Dog Kennel Management</title>
-    <link rel="stylesheet" href="css/style.css?v=20260808">
+    <link rel="stylesheet" href="css/style.css?v=20260809">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
@@ -151,6 +151,36 @@
         </div>
     </div>
 
+    <!-- Health Status Modal (Health Records page "Log health status" button) -->
+    <div class="modal-overlay" id="healthStatusModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h2>Log Health Status</h2>
+                <button class="modal-close" id="healthStatusModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="healthStatusForm">
+                    <div class="form-group">
+                        <label for="healthStatusDogId">Dog *</label>
+                        <select id="healthStatusDogId"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="healthStatusValue">Health status *</label>
+                        <select id="healthStatusValue">
+                            <option value="">Select...</option>
+                            <option value="Good">Good</option>
+                            <option value="Needs Watch">Needs Watch</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="healthStatusModalCancel">Cancel</button>
+                <button class="btn btn-primary" id="healthStatusModalSave">Save status</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Record Modal -->
     <div class="modal-overlay" id="recordModal">
         <div class="modal">
@@ -262,8 +292,8 @@
         </div>
     </div>
 
-    <script src="js/data.js?v=20260808"></script>
-    <script src="js/components.js?v=20260808"></script>
-    <script src="js/app.js?v=20260808"></script>
+    <script src="js/data.js?v=20260809"></script>
+    <script src="js/components.js?v=20260809"></script>
+    <script src="js/app.js?v=20260809"></script>
 </body>
 </html>

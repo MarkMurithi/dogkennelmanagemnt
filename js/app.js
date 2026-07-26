@@ -37,6 +37,7 @@ const App = {
         this.setupDeleteModal();
         this.setupInvoiceModal();
         this.setupDailyReportDetailModal();
+        this.setupHealthStatusModal();
         this.render();
 
         // Subscribe to data changes. Renders are scheduled (coalesced) rather than
@@ -290,7 +291,7 @@ const App = {
 
         window.addEventListener('popstate', () => {
             // 1. Close any open modal first (highest priority)
-            const modalsToCheck = ['dogModal', 'recordModal', 'deleteModal', 'invoiceModal', 'dailyReportDetailModal'];
+            const modalsToCheck = ['dogModal', 'recordModal', 'deleteModal', 'invoiceModal', 'dailyReportDetailModal', 'healthStatusModal'];
             for (const id of modalsToCheck) {
                 const el = document.getElementById(id);
                 if (el && el.classList.contains('open')) {
@@ -1704,6 +1705,31 @@ const App = {
         }
     },
 
+    // Opens the standalone "Log health status" modal from the Health Records page.
+    // This is intentionally separate from the Daily Report's "Dog status checklist" —
+    // it only records Good/Needs Watch (no grooming/medication) and can be logged at
+    // any time of day, not just as part of a full daily report. Both feed into the
+    // same KennelData.addDogStatusUpdate()/getDogDailyHealthStatuses() pipeline, so
+    // whichever entry (this quick log or a Daily Report) is most recent is what shows
+    // as the dog's current health status.
+    showLogHealthStatusModal() {
+        if (!this._requireEditAccess()) return;
+        const dogSelect = document.getElementById('healthStatusDogId');
+        const healthSelect = document.getElementById('healthStatusValue');
+        const modal = document.getElementById('healthStatusModal');
+        if (!dogSelect || !healthSelect || !modal) {
+            Components.toast('Health status form is unavailable. Please refresh the page.', 'error');
+            return;
+        }
+        const dogs = KennelData.getDogs().filter(dog => dog.status === 'Active');
+        dogSelect.innerHTML = dogs.length
+            ? dogs.map(dog => '<option value="' + dog.id + '">' + Components.escapeHtml(dog.name) + '</option>').join('')
+            : '<option value="">No dogs available</option>';
+        healthSelect.value = '';
+        modal.classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'healthStatusModal' }, '', window.location.pathname + window.location.search);
+    },
+
     setupDetailTabs() {
         document.querySelectorAll('.records-tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -2439,6 +2465,55 @@ const App = {
             if (e.target === document.getElementById('deleteModal')) {
                 document.getElementById('deleteModal').classList.remove('open');
             }
+        });
+    },
+
+    setupHealthStatusModal() {
+        const modal = document.getElementById('healthStatusModal');
+        const closeModal = () => { if (modal) modal.classList.remove('open'); };
+
+        document.getElementById('healthStatusModalCancel').addEventListener('click', closeModal);
+        document.getElementById('healthStatusModalClose').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        document.getElementById('healthStatusModalSave').addEventListener('click', () => {
+            const dogSelect = document.getElementById('healthStatusDogId');
+            const healthSelect = document.getElementById('healthStatusValue');
+            if (!dogSelect || !dogSelect.value) {
+                Components.toast('Please select a dog first.', 'error');
+                return;
+            }
+            if (!healthSelect || !healthSelect.value) {
+                Components.toast('Please select a health status.', 'error');
+                return;
+            }
+            const dogId = dogSelect.value;
+            const dogName = dogSelect.options[dogSelect.selectedIndex]?.text || 'Dog';
+            const healthValue = healthSelect.value;
+            const currentUser = KennelData.getCurrentUser();
+
+            KennelData.addDogStatusUpdate({
+                dogId: dogId,
+                dogName: dogName,
+                healthStatus: healthValue,
+                groomingStatus: '',
+                medication: '',
+                personInCharge: currentUser ? currentUser.name : ''
+            }).then((result) => {
+                if (!result || !result.ok) {
+                    Components.toast((result && result.error) || 'Unable to save health status right now.', 'error');
+                    return;
+                }
+                closeModal();
+                if (result.pending) {
+                    Components.toast(result.message || (dogName + '\u2019s health status submitted for admin approval.'));
+                } else {
+                    Components.toast(dogName + '\u2019s health status logged');
+                }
+                this.render();
+            });
         });
     },
 

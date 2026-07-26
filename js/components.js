@@ -1055,7 +1055,11 @@ const Components = {
             '<section class="page-hero">' +
             '<div><div class="hero-badge"><i class="fas fa-heartbeat"></i> Health tracking</div><h2>Monitor every medical milestone</h2><p>Review the latest health and vet visits for each dog in one place.</p></div>' +
             '</section>' +
-            '<div class="section-header"><h2><i class="fas fa-heartbeat"></i> Health Records</h2><div class="section-badge"><i class="fas fa-notes-medical"></i> Vet history</div></div>' +
+            '<div class="section-header"><h2><i class="fas fa-heartbeat"></i> Health Records</h2><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="section-badge"><i class="fas fa-notes-medical"></i> Vet history</div>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<button class="btn btn-primary btn-sm" onclick="App.showLogHealthStatusModal()"><i class="fas fa-stethoscope"></i> Log health status</button>'
+                : '') +
+            '</div></div>' +
             '<div class="content-grid">' + cardsHtml + '</div></div>';
     },
 
