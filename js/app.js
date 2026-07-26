@@ -1794,6 +1794,25 @@ const App = {
         Components.toast('All kennel data cleared');
     },
 
+    toggleDataVisibility() {
+        if (KennelData.getCurrentUserRole() !== 'admin') return;
+        const nextHidden = !KennelData.getDataHidden();
+        const confirmMessage = nextHidden
+            ? 'Hide dogs, puppies, finance, health records, calendar, daily reports and chat from staff and reviewers? Entry forms will remain usable for input.'
+            : 'Unhide all data so staff and reviewers can see it again?';
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+        KennelData.setDataVisibility(nextHidden).then((result) => {
+            if (!result || !result.ok) {
+                Components.toast((result && result.error) || 'Unable to update data visibility right now.', 'error');
+                return;
+            }
+            Components.toast(nextHidden ? 'Data is now hidden from staff and reviewers' : 'Data is now visible to everyone');
+            this.render();
+        });
+    },
+
     exportData() {
         const payload = KennelData.exportData();
         const blob = new Blob([payload], { type: 'application/json' });

@@ -1393,6 +1393,14 @@ const Components = {
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-user-shield"></i> Account access</h3></div><div class="card-body"><p><strong>' + (user && user.name ? user.name : 'Current user') + '</strong> is signed in as ' + role + '.</p><div style="margin-top:10px">' + roleBadge + '</div><p style="margin-top:12px;color:var(--gray-500)">' + (role === 'reviewer' ? 'Reviewers can inspect finance activity and approval queues without changing workspace settings.' : 'Admin users can manage full kennel data, while staff accounts have limited access to protected areas.') + '</p></div></div>';
 
+        var dataHidden = KennelData.getDataHidden();
+        var hideStatusBadge = dataHidden
+            ? '<span class="status-pill deceased"><i class="fas fa-eye-slash"></i> Data is hidden from staff &amp; reviewers</span>'
+            : '<span class="status-pill active"><i class="fas fa-eye"></i> Data is visible to everyone</span>';
+        var hideToggleBtn = dataHidden
+            ? '<button class="btn btn-secondary" onclick="App.toggleDataVisibility()"><i class="fas fa-eye"></i> Unhide data</button>'
+            : '<button class="btn btn-secondary" onclick="App.toggleDataVisibility()"><i class="fas fa-eye-slash"></i> Hide data</button>';
+
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-sync"></i> Data tools</h3></div><div class="card-body"><p>Your kennel data is saved locally and updates automatically as you work.</p>' +
             '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">' +
             '<button class="btn btn-primary" onclick="App.exportData()"><i class="fas fa-download"></i> Export backup</button>' +
@@ -1400,7 +1408,12 @@ const Components = {
             '<button class="btn btn-secondary" onclick="App.importData()"><i class="fas fa-upload"></i> Import backup</button>' +
             '</div>' +
             '<input type="file" id="importDataInput" accept="application/json" style="display:none" onchange="App.handleImportData(this.files[0])">' +
-            '<button class="btn btn-secondary" style="margin-top:12px" onclick="App.resetAppData()"><i class="fas fa-trash"></i> Clear all data</button></div></div>';
+            '<button class="btn btn-secondary" style="margin-top:12px" onclick="App.resetAppData()"><i class="fas fa-trash"></i> Clear all data</button>' +
+            '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--gray-200)">' +
+            '<p style="margin-bottom:8px">' + hideStatusBadge + '</p>' +
+            '<p style="color:var(--gray-500);font-size:0.9rem;margin-bottom:10px">Hide dogs, puppies, finance, health records, calendar, daily reports and chat from staff and reviewers so the app looks fresh for demos. Entry forms stay usable for input.</p>' +
+            hideToggleBtn +
+            '</div></div></div>';
 
         if (!pendingApprovals.length) {
             pendingRows = '<p style="color:var(--gray-400)">No items need review right now.</p>';

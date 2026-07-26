@@ -12,6 +12,7 @@ const KennelData = {
     _submissionStatusCache: {},
     _currentUser: null,
     _maxUsers: 20,
+    _dataHidden: false,
     _serverState: { status: 'online', message: '' },
     _listeners: [],
     _pendingWrites: [],
@@ -350,7 +351,8 @@ const KennelData = {
             this._syncCollection('/events', '_events'),
             this._syncCollection('/daily-reports', '_dailyReports'),
             this._syncCollection('/activities', '_activities'),
-            this._syncCollection('/my-submissions', '_mySubmissions')
+            this._syncCollection('/my-submissions', '_mySubmissions'),
+            this.fetchDataVisibility()
         ];
         return Promise.all(requests).then(function(changedFlags) {
             this._primeSubmissionStatusCache();
@@ -366,6 +368,35 @@ const KennelData = {
     // page reload. Only triggers a UI re-render if something actually changed.
     refreshFromServer() {
         return this._syncFromServer({ silent: true });
+    },
+
+    getDataHidden() {
+        return !!this._dataHidden;
+    },
+
+    fetchDataVisibility() {
+        return this._request('/settings/data-visibility', { method: 'GET' }).then(function(result) {
+            const previous = this._dataHidden;
+            if (result && typeof result.hidden === 'boolean') {
+                this._dataHidden = result.hidden;
+            }
+            return this._dataHidden !== previous;
+        }.bind(this)).catch(function() { return false; });
+    },
+
+    setDataVisibility(hidden) {
+        return this._request('/settings/data-visibility', {
+            method: 'POST',
+            body: JSON.stringify({ hidden: !!hidden })
+        }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to update data visibility right now.' };
+            }
+            this._dataHidden = !!result.hidden;
+            return this._syncFromServer().then(function() { return result; });
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to update data visibility right now.' };
+        });
     },
 
     _resetEmptyState() {

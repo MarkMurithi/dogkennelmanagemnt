@@ -297,10 +297,30 @@ def init_db():
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+        """
+    )
     conn.commit()
     _ensure_super_admin(conn)
     conn.commit()
     conn.close()
+
+
+def _get_app_setting(conn, key, default=None):
+    row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return default
+    return row[0]
+
+
+def _set_app_setting(conn, key, value):
+    conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+    conn.execute("INSERT INTO app_settings (key, value) VALUES (?, ?)", (key, value))
 
 
 def _ensure_super_admin(conn):
@@ -532,6 +552,12 @@ class KennelHandler(BaseHTTPRequestHandler):
 
     def _is_super_admin(self, user):
         return bool(user) and str(user.get("email", "")).strip().lower() == SUPER_ADMIN_EMAIL
+
+    def _is_data_hidden(self):
+        conn = self._connect()
+        value = _get_app_setting(conn, "data_hidden", "0")
+        conn.close()
+        return str(value) == "1"
 
     def _normalize_role(self, role):
         normalized = str(role or "staff").strip().lower() or "staff"
@@ -1295,6 +1321,27 @@ class KennelHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "entries": payload})
             return
 
+        if path == "/api/settings/data-visibility" and method == "GET":
+            user = self._require_auth()
+            if not user:
+                return
+            self._send_json(200, {"ok": True, "hidden": self._is_data_hidden()})
+            return
+
+        if path == "/api/settings/data-visibility" and method == "POST":
+            user = self._require_auth()
+            if not self._require_role(user, {"admin"}):
+                return
+            payload = self._parse_json(body)
+            hidden = bool(payload.get("hidden", False))
+            conn = self._connect()
+            _set_app_setting(conn, "data_hidden", "1" if hidden else "0")
+            conn.commit()
+            conn.close()
+            self._log_audit(user, "toggle_data_visibility", None, f"Data visibility set to {'hidden' if hidden else 'visible'}")
+            self._send_json(200, {"ok": True, "hidden": hidden})
+            return
+
         if path == "/api/pending-approvals" and method == "GET":
             user = self._require_auth()
             if not self._require_role(user, {"admin", "reviewer"}):
@@ -1585,6 +1632,9 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, {"ok": True, "messages": []})
+                return
             since = self.path.split("since=")[-1] if "since=" in self.path else ""
             is_admin = user.get("role") == "admin"
 
@@ -1705,6 +1755,9 @@ class KennelHandler(BaseHTTPRequestHandler):
         if path == "/api/dogs" and method == "GET":
             user = self._require_auth()
             if not user:
+                return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT id, name, breed, gender, dob, status, weight, color, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, pedigreeCertificate, pedigreeCertificateName, notes, value, forSale, price, image, records, attachments, createdAt FROM dogs ORDER BY createdAt DESC")
             dogs_payload = []
@@ -1874,6 +1927,9 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
+                return
             rows = self._fetch_all("SELECT id, name, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt FROM puppies ORDER BY createdAt DESC")
             payload = []
             for row in rows:
@@ -2017,6 +2073,9 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not self._require_role(user, {"admin", "reviewer"}):
                 return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
+                return
             rows = self._fetch_all("SELECT * FROM finance ORDER BY date DESC, createdAt DESC")
             payload = [
                 {"id": row[0], "type": row[1], "title": row[2], "category": row[3], "amount": row[4], "date": row[5], "related": row[6], "notes": row[7], "createdAt": row[8]}
@@ -2085,6 +2144,9 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
+                return
             rows = self._fetch_all("SELECT * FROM events ORDER BY date ASC")
             payload = [{"id": row[0], "title": row[1], "date": row[2], "notes": row[3], "createdAt": row[4]} for row in rows]
             self._send_json(200, payload)
@@ -2093,6 +2155,9 @@ class KennelHandler(BaseHTTPRequestHandler):
         if path == "/api/daily-reports" and method == "GET":
             user = self._require_auth()
             if not user:
+                return
+            if user.get("role") != "admin" and self._is_data_hidden():
+                self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, puppiesFeeding, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
             payload = []
