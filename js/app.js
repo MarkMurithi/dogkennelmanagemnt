@@ -1674,6 +1674,18 @@ const App = {
         this.currentDogId = null;
     },
 
+    openDogHealthRecords(dogId) {
+        this.openDogDetail(dogId);
+        const overlay = document.getElementById('dogDetailOverlay');
+        if (!overlay) return;
+        const healthTab = overlay.querySelector('.records-tab[data-tab="health"]');
+        if (healthTab) healthTab.click();
+        const recordsSection = overlay.querySelector('.profile-section-records');
+        if (recordsSection) {
+            recordsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    },
+
     setupDetailTabs() {
         document.querySelectorAll('.records-tab').forEach(tab => {
             tab.addEventListener('click', () => {

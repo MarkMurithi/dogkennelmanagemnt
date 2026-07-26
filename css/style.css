@@ -2120,6 +2120,16 @@ body.modal-open {
     min-height: 100%;
 }
 
+.clickable-card {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clickable-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(23, 19, 13, 0.10);
+}
+
 .section-card.full-width {
     grid-column: 1 / -1;
 }

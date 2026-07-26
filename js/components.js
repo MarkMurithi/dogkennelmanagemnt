@@ -1033,7 +1033,7 @@ const Components = {
                 }
             }
 
-            cardsHtml += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-heartbeat"></i> ' + dog.name + '</h3></div><div class="card-body">' + recordsHtml + '</div></div>';
+            cardsHtml += '<div class="card section-card clickable-card" onclick="App.openDogHealthRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s full medical &amp; care records"><div class="card-header"><h3><i class="fas fa-heartbeat"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>';
         }
 
         if (!cardsHtml) {
