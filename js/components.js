@@ -1363,6 +1363,9 @@ const Components = {
                         '<label for="editUserActive" style="margin:0">Account active</label>' +
                         '</div>' +
                         '</div>' +
+                        '<div class="form-row">' +
+                        '<div class="form-group half"><label>New password</label><input type="password" id="editUserPassword" autocomplete="new-password" placeholder="Leave blank to keep current password"></div>' +
+                        '</div>' +
                         '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
                         '<button class="btn btn-primary btn-sm" onclick="App.saveUserEdit(\'' + item.id + '\')"><i class="fas fa-save"></i> Save</button>' +
                         '<button class="btn btn-secondary btn-sm" onclick="App.cancelUserEdit()">Cancel</button>' +

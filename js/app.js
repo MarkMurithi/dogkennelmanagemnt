@@ -914,19 +914,29 @@ const App = {
         const email = document.getElementById('editUserEmail');
         const role = document.getElementById('editUserRole');
         const active = document.getElementById('editUserActive');
+        const password = document.getElementById('editUserPassword');
         if (!name || !email || !role) return;
         if (!name.value.trim() || !email.value.trim()) {
             Components.toast('Name and email are required.', 'error');
             return;
         }
-        KennelData.updateUser(userId, {
+        const newPassword = password ? password.value.trim() : '';
+        if (newPassword && newPassword.length < 8) {
+            Components.toast('New password must be at least 8 characters long.', 'error');
+            return;
+        }
+        const updates = {
             name: name.value.trim(),
             email: email.value.trim().toLowerCase(),
             role: role.value,
             active: active ? active.checked : true
-        }).then(function(result) {
+        };
+        if (newPassword) {
+            updates.password = newPassword;
+        }
+        KennelData.updateUser(userId, updates).then(function(result) {
             if (result.ok) {
-                Components.toast('User updated successfully');
+                Components.toast(newPassword ? 'User updated and password changed' : 'User updated successfully');
                 this.editingUserId = null;
                 this.render();
             } else {

@@ -1590,8 +1590,15 @@ class KennelHandler(BaseHTTPRequestHandler):
                     if new_active == 0:
                         conn.execute("DELETE FROM auth_tokens WHERE user_id = ?", (target_id,))
                 if "password" in payload and str(payload.get("password", "")).strip():
+                    new_password = str(payload.get("password", "")).strip()
+                    if len(new_password) < 8:
+                        conn.close()
+                        self._send_json(400, {"ok": False, "error": "Password must be at least 8 characters long."})
+                        return
                     updates.append("password = ?")
-                    values.append(self._hash_password(str(payload.get("password", "")).strip()))
+                    values.append(self._hash_password(new_password))
+                    # Revoke existing sessions so the new password takes effect immediately everywhere
+                    conn.execute("DELETE FROM auth_tokens WHERE user_id = ?", (target_id,))
                 values.append(target_id)
                 conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", values)
                 conn.commit()
