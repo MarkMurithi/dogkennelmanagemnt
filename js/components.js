@@ -127,14 +127,17 @@ const Components = {
         var safeWeight = this.escapeHtml(dog.weight ? (dog.weight + ' kg') : 'N/A');
         var safeStatus = this.escapeHtml(dog.status || 'Active');
         var safeGender = this.escapeHtml(dog.gender || 'Unknown');
-        var hasImage = dog.image && dog.image.trim() !== '';
+        var displayImage = (dog.image && String(dog.image).trim() !== '')
+            ? dog.image
+            : ((dog.attachments && dog.attachments.length > 0) ? dog.attachments[0] : '');
+        var hasImage = displayImage && String(displayImage).trim() !== '';
         var age = dog.dob ? this.calculateAge(dog.dob) : 'N/A';
         var genderClass = dog.gender === 'Male' ? 'tag-male' : 'tag-female';
         var genderIcon = dog.gender === 'Male' ? 'fa-mars' : 'fa-venus';
         var placeholder = '<div class="dog-card-image-placeholder"><i class="fas fa-dog"></i></div>';
         var imageHtml;
         if (hasImage) {
-            imageHtml = '<img class="dog-card-image" src="' + this.escapeHtml(dog.image) + '" alt="' + safeName + '">';
+            imageHtml = '<img class="dog-card-image" src="' + this.escapeHtml(displayImage) + '" alt="' + safeName + '">';
         } else {
             imageHtml = placeholder;
         }
@@ -308,7 +311,10 @@ const Components = {
 
     dogDetailPanel: function(dog) {
         var safe = this.escapeHtml.bind(this);
-        var hasImage = dog.image && dog.image.trim() !== '';
+        var displayImage = (dog.image && String(dog.image).trim() !== '')
+            ? dog.image
+            : ((dog.attachments && dog.attachments.length > 0) ? dog.attachments[0] : '');
+        var hasImage = displayImage && String(displayImage).trim() !== '';
         var safeDogName = safe(dog.name || 'Dog');
         var safeDogBreed = safe(dog.breed || 'Unknown breed');
         var safeDogGender = safe(dog.gender || 'Unknown');
@@ -350,7 +356,7 @@ const Components = {
         }
         var avatarHtml;
         if (hasImage) {
-            avatarHtml = '<img class="detail-avatar" src="' + safe(dog.image) + '" alt="' + safeDogName + '">';
+            avatarHtml = '<img class="detail-avatar" src="' + safe(displayImage) + '" alt="' + safeDogName + '">';
         } else {
             avatarHtml = '<div class="detail-avatar-placeholder"><i class="fas fa-dog"></i></div>';
         }

@@ -1317,11 +1317,14 @@ class KennelHandler(BaseHTTPRequestHandler):
         return {"id": backup_id, "label": label, "createdAt": self._now(), "filePath": relative_path, "size": file_path.stat().st_size, "source": source}
 
     def _create_backup_safe(self, label="Auto-export", source="auto"):
-        try:
-            return self._create_backup(label=label, source=source)
-        except Exception as exc:
-            print(f"Backup skipped after write: {exc}", file=sys.stderr)
-            return None
+        def _backup_worker():
+            try:
+                self._create_backup(label=label, source=source)
+            except Exception as exc:
+                print(f"Backup skipped after write: {exc}", file=sys.stderr)
+
+        threading.Thread(target=_backup_worker, daemon=True).start()
+        return None
 
     def _restore_backup(self, backup_id):
         conn = self._connect()

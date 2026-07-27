@@ -1571,7 +1571,7 @@ const App = {
                 };
 
                 if (!isEdit || hasImageChanged) {
-                    dogData.image = resolvedImageValue;
+                    dogData.image = hasNewAttachments ? '' : resolvedImageValue;
                 }
                 if (!isEdit || hasNewAttachments) {
                     dogData.attachments = attachments || [];
