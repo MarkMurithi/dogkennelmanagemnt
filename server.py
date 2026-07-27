@@ -1309,6 +1309,13 @@ class KennelHandler(BaseHTTPRequestHandler):
         conn.close()
         return {"id": backup_id, "label": label, "createdAt": self._now(), "filePath": relative_path, "size": file_path.stat().st_size, "source": source}
 
+    def _create_backup_safe(self, label="Auto-export", source="auto"):
+        try:
+            return self._create_backup(label=label, source=source)
+        except Exception as exc:
+            print(f"Backup skipped after write: {exc}", file=sys.stderr)
+            return None
+
     def _restore_backup(self, backup_id):
         conn = self._connect()
         row = conn.execute("SELECT snapshot FROM backup_history WHERE id = ?", (backup_id,)).fetchone()
@@ -1496,7 +1503,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("UPDATE pending_approvals SET status = ?, reviewedAt = ?, reviewedBy = ?, reviewNotes = ? WHERE id = ?", ("approved", self._now(), user.get("id"), notes, approval_id))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "approve_pending", approval_id, f"Approved pending approval {approval_id}")
             self._send_json(200, {"ok": True, "result": result})
             return
@@ -1602,7 +1609,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.commit()
                 row = conn.execute("SELECT id, name, email, role, active, createdAt FROM users WHERE id = ?", (user_id,)).fetchone()
                 conn.close()
-                self._create_backup(label="Auto-export", source="auto")
+                self._create_backup_safe(label="Auto-export", source="auto")
                 self._log_audit(user, "create_user", user_id, f"Created user {name} ({email})")
                 self._send_json(200, {"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]}})
             except DatabaseIntegrityError:
@@ -1662,7 +1669,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 conn.commit()
                 row = conn.execute("SELECT id, name, email, role, active, createdAt FROM users WHERE id = ?", (target_id,)).fetchone()
                 conn.close()
-                self._create_backup(label="Auto-export", source="auto")
+                self._create_backup_safe(label="Auto-export", source="auto")
                 self._log_audit(user, "update_user", target_id, f"Updated user {row[1] if row else target_id}")
                 self._send_json(200, {"ok": True, "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[3], "active": bool(row[4]), "createdAt": row[5]}})
                 return
@@ -1670,7 +1677,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM users WHERE id = ?", (target_id,))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "delete_user", target_id, f"Deleted user {target_id}")
             self._send_json(200, {"ok": True})
             return
@@ -1897,7 +1904,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "create_dog", created.get("id"), f"Created dog {created.get('name')}")
             self._send_json(200, {"ok": True, "dog": {**payload, **created}})
             return
@@ -1982,7 +1989,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 )
                 conn.commit()
                 conn.close()
-                self._create_backup(label="Auto-export", source="auto")
+                self._create_backup_safe(label="Auto-export", source="auto")
                 self._log_audit(user, "update_dog", dog_id, f"Updated dog {name}")
                 self._send_json(200, {"ok": True, "dog": {**payload, "name": name, "breed": breed, "gender": gender, "coat": coat}})
                 return
@@ -2001,7 +2008,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM dogs WHERE id = ?", (dog_id,))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "delete_dog", dog_id, f"Deleted dog {dog_id}")
             self._send_json(200, {"ok": True})
             return
@@ -2065,7 +2072,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "create_puppy", created.get("id"), f"Created puppy {created.get('name')}")
             self._send_json(200, {"ok": True, "puppy": {**payload, **created}})
             return
@@ -2134,7 +2141,7 @@ class KennelHandler(BaseHTTPRequestHandler):
                 )
                 conn.commit()
                 conn.close()
-                self._create_backup(label="Auto-export", source="auto")
+                self._create_backup_safe(label="Auto-export", source="auto")
                 self._log_audit(user, "update_puppy", puppy_id, f"Updated puppy {name}")
                 self._send_json(200, {"ok": True, "puppy": {**payload, "id": puppy_id, "name": name, "breed": breed, "coat": coat, "gender": gender, "collarColor": collar_color}})
                 return
@@ -2153,7 +2160,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM puppies WHERE id = ?", (puppy_id,))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "delete_puppy", puppy_id, f"Deleted puppy {puppy_id}")
             self._send_json(200, {"ok": True})
             return
@@ -2197,7 +2204,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "create_finance", created.get("id"), f"Created finance entry {created.get('title')}")
             self._send_json(200, {"ok": True, "entry": {**payload, **created}})
             return
@@ -2224,7 +2231,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM finance WHERE id = ?", (entry_id,))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "delete_finance", entry_id, f"Deleted finance entry {entry_id}")
             self._send_json(200, {"ok": True})
             return
@@ -2410,7 +2417,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "create_event", created.get("id"), f"Created event {created.get('title')}")
             self._send_json(200, {"ok": True, "event": {**payload, **created}})
             return
@@ -2435,7 +2442,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
             conn.commit()
             conn.close()
-            self._create_backup(label="Auto-export", source="auto")
+            self._create_backup_safe(label="Auto-export", source="auto")
             self._send_json(200, {"ok": True})
             return
 
