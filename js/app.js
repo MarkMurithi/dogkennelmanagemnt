@@ -1404,6 +1404,7 @@ const App = {
         document.getElementById('dogDob').value = dog.dob || '';
         document.getElementById('dogWeight').value = dog.weight || '';
         document.getElementById('dogColor').value = dog.color || '';
+        document.getElementById('dogCoat').value = dog.coat || '';
         document.getElementById('dogMicrochip').value = dog.microchip || '';
         document.getElementById('dogRegistration').value = dog.registration || '';
         document.getElementById('dogOwnerName').value = dog.ownerName || '';
@@ -1539,6 +1540,7 @@ const App = {
                     dob: document.getElementById('dogDob').value || null,
                     weight: parseFloat(document.getElementById('dogWeight').value) || null,
                     color: document.getElementById('dogColor').value.trim(),
+                    coat: document.getElementById('dogCoat').value,
                     microchip: document.getElementById('dogMicrochip').value.trim(),
                     registration: document.getElementById('dogRegistration').value.trim(),
                     ownerName: document.getElementById('dogOwnerName').value.trim(),

@@ -314,6 +314,7 @@ const Components = {
         var safeDogGender = safe(dog.gender || 'Unknown');
         var safeDogWeight = safe(dog.weight ? (dog.weight + ' kg') : 'N/A');
         var safeDogColor = safe(dog.color || 'N/A');
+        var safeDogCoat = safe(dog.coat || 'N/A');
         var safeDogRegistration = safe(dog.registration || 'N/A');
         var safeDogMicrochip = safe(dog.microchip || 'N/A');
         var safeDogOwnerName = safe(dog.ownerName || 'Not assigned');
@@ -432,6 +433,7 @@ const Components = {
                 fieldItem('Age', age) +
                 fieldItem('Weight', safeDogWeight) +
                 fieldItem('Color', safeDogColor) +
+                fieldItem('Coat', safeDogCoat) +
                 fieldItem('Status', '<span class="tag ' + statusClass + '">' + safeStatusValue + '</span>') +
                 fieldItem('Microchip', safeDogMicrochip) +
                 fieldItem('Registration', safeDogRegistration) +
