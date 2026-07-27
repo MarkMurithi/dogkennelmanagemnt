@@ -1086,7 +1086,7 @@ const Components = {
                 }
             }
 
-            cardsHtml += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-dna"></i> ' + dog.name + '</h3></div><div class="card-body">' + recordsHtml + '</div></div>';
+            cardsHtml += '<div class="card section-card clickable-card" onclick="App.openDogBreedingRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s breeding records in profile"><div class="card-header"><h3><i class="fas fa-dna"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>';
         }
 
         if (!cardsHtml) {

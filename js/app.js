@@ -1678,6 +1678,18 @@ const App = {
         }
     },
 
+    openDogBreedingRecords(dogId) {
+        this.openDogDetail(dogId);
+        const overlay = document.getElementById('dogDetailOverlay');
+        if (!overlay) return;
+        const breedingTab = overlay.querySelector('.records-tab[data-tab="breeding"]');
+        if (breedingTab) breedingTab.click();
+        const recordsSection = overlay.querySelector('.profile-section-records');
+        if (recordsSection) {
+            recordsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    },
+
     // Opens the standalone "Log health status" modal from the Health Records page.
     // This is intentionally separate from the Daily Report's "Dog status checklist" —
     // it only records Good/Needs Watch (no grooming/medication) and can be logged at
