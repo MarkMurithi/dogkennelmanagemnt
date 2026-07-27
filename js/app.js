@@ -1346,7 +1346,7 @@ const App = {
         // Update badge
         const badge = document.getElementById('totalDogsBadge');
         if (badge) {
-            badge.textContent = KennelData.getDogs().length + ' dogs';
+            badge.textContent = KennelData.getOperationalDogs().length + ' dogs';
         }
     },
 
@@ -1592,6 +1592,9 @@ const App = {
                         Components.toast(dogId ? `${dogData.name} update submitted for admin approval.` : `${dogData.name} submitted for admin approval.`);
                     } else {
                         Components.toast(dogId ? `${dogData.name} updated successfully!` : `${dogData.name} added to kennel!`);
+                        if (result.financeUpdated) {
+                            Components.toast('Finance was updated automatically from this status change.');
+                        }
                     }
                     document.getElementById('dogModal').classList.remove('open');
                     this.closeDogDetail();
@@ -1732,7 +1735,7 @@ const App = {
             Components.toast('Health status form is unavailable. Please refresh the page.', 'error');
             return;
         }
-        const dogs = KennelData.getDogs().filter(dog => dog.status === 'Active');
+        const dogs = KennelData.getOperationalDogs().filter(dog => dog.status === 'Active');
         dogSelect.innerHTML = dogs.length
             ? dogs.map(dog => '<option value="' + dog.id + '">' + Components.escapeHtml(dog.name) + '</option>').join('')
             : '<option value="">No dogs available</option>';

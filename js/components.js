@@ -142,6 +142,7 @@ const Components = {
             imageHtml = placeholder;
         }
         var saleBadge = dog.forSale ? '<div class="dog-card-sale-badge">For Sale</div>' : '';
+        var isArchived = KennelData.isArchivedDogStatus(dog.status);
         var _cardRole = KennelData.getCurrentUserRole();
         var _cardCanSeeMoney = _cardRole === 'admin' || _cardRole === 'reviewer';
         var priceTag = (_cardCanSeeMoney && dog.forSale && dog.price) ? '<span class="tag tag-for-sale">KSh ' + Number(dog.price).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' : (dog.forSale ? '<span class="tag tag-for-sale">For Sale</span>' : '');
@@ -149,7 +150,7 @@ const Components = {
         var statusValue = dog.status || 'Active';
         var statusClass = 'tag-' + statusValue.toLowerCase();
 
-        return '<div class="card dog-card" onclick="App.openDogDetail(\'' + dog.id + '\')">' +
+        return '<div class="card dog-card' + (isArchived ? ' archived-dog-card' : '') + '" onclick="App.openDogDetail(\'' + dog.id + '\')">' +
             saleBadge +
             imageFrame +
             '<div class="dog-card-body">' +
@@ -333,6 +334,7 @@ const Components = {
         var statusValue = dog.status || 'Active';
         var safeStatusValue = safe(statusValue);
         var statusClass = 'tag-' + statusValue.toLowerCase();
+        var isArchived = KennelData.isArchivedDogStatus(statusValue);
         var dailyStatuses = KennelData.getDogDailyHealthStatuses(dog.id, dog.name);
         var latestDailyStatus = dailyStatuses.length > 0 ? dailyStatuses[0] : null;
         var healthRecords = ((dog.records && dog.records.health) || []).slice().sort(function(a, b) {
@@ -488,7 +490,7 @@ const Components = {
             '</div>';
 
         return '<div class="dog-detail-overlay open" id="dogDetailOverlay" onclick="if(event.target===this)App.closeDogDetail()">' +
-            '<div class="dog-detail-panel dog-profile-panel">' +
+            '<div class="dog-detail-panel dog-profile-panel' + (isArchived ? ' dog-profile-archived' : '') + '">' +
             '<div class="detail-header dog-profile-header">' +
             '<button class="detail-close" onclick="App.closeDogDetail()"><i class="fas fa-times"></i></button>' +
             '<div class="dog-profile-hero">' +
@@ -511,6 +513,7 @@ const Components = {
                   '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:var(--white);border:1px solid rgba(255,255,255,0.3)" onclick="App.deleteDogPrompt(\'' + dog.id + '\')"><i class="fas fa-trash"></i> Delete</button>'
                 : '<span style="font-size:0.8rem;color:rgba(255,255,255,0.75);padding:8px 4px"><i class="fas fa-eye"></i> View only</span>') +
             '</div>' +
+                        (isArchived ? '<p style="margin-top:10px;color:rgba(255,255,255,0.9);font-size:0.86rem"><i class="fas fa-info-circle"></i> Archived profile: removed from operational pages and selectors.</p>' : '') +
                 '</div></div>' +
                 '<div class="detail-body dog-profile-body">' +
                 '<div class="dog-profile-layout">' +
@@ -654,7 +657,7 @@ const Components = {
         }
 
         var stats = KennelData.getStats();
-        var dogs = KennelData.getDogs();
+        var dogs = KennelData.getOperationalDogs();
         var activities = KennelData.getActivities(8);
         var alerts = KennelData.getAlerts().slice(0, 5);
         var mySubmissions = KennelData.getMySubmissions().slice(0, 6);
@@ -896,7 +899,7 @@ const Components = {
     // Shared by myDogsPage (full render) and App.searchDogs/filterDogs (partial
     // grid-only update) so filtering doesn't require rebuilding the whole page.
     _buildDogResults: function(filterGender, searchQuery, saleFilter) {
-        var dogs = KennelData.getDogs();
+        var dogs = KennelData.getOperationalDogs();
         if (searchQuery) {
             var q = searchQuery.toLowerCase();
             dogs = dogs.filter(function(d) { return d.name.toLowerCase().indexOf(q) !== -1 || d.breed.toLowerCase().indexOf(q) !== -1; });
@@ -937,6 +940,23 @@ const Components = {
         var dogs = results.dogs;
         var dogCardsHtml = results.dogCardsHtml;
         var emptyHtml = results.emptyHtml;
+        var archivedDogs = KennelData.getArchivedDogs().sort(function(a, b) {
+            return a.name.localeCompare(b.name);
+        });
+        var archivedSectionHtml = '';
+        if (archivedDogs.length > 0) {
+            var archivedCardsHtml = '';
+            for (var i = 0; i < archivedDogs.length; i++) {
+                archivedCardsHtml += this.dogCard(archivedDogs[i]);
+            }
+            archivedSectionHtml =
+                '<div class="section-header" style="margin-top:24px">' +
+                '<h2><i class="fas fa-archive"></i> Archived Profiles <span class="dog-count-badge" style="font-size:0.9rem;font-weight:400;color:var(--gray-500)">(' + archivedDogs.length + ')</span></h2>' +
+                '<div class="section-badge"><i class="fas fa-moon"></i> Sold &amp; deceased</div>' +
+                '</div>' +
+                '<p style="margin:0 0 10px;color:var(--gray-500);font-size:0.92rem">These dogs are removed from operational pages and selectors. Their profiles remain for history.</p>' +
+                '<div class="dog-grid">' + archivedCardsHtml + '</div>';
+        }
 
         return '<div class="page-shell" id="pageMyDogs">' +
             '<section class="page-hero">' +
@@ -966,11 +986,13 @@ const Components = {
             '<option value="sale"' + (saleFilter === 'sale' ? ' selected' : '') + '>For Sale</option>' +
             '</select></div>' +
             '<div class="dog-grid">' + dogCardsHtml + '</div>' +
-            emptyHtml + '</div>';
+            emptyHtml +
+            archivedSectionHtml +
+            '</div>';
     },
 
     healthRecordsPage: function() {
-        var dogs = KennelData.getDogs().filter(function(dog) { return dog.status === 'Active'; });
+        var dogs = KennelData.getOperationalDogs().filter(function(dog) { return dog.status === 'Active'; });
         var dogCards = [];
 
         for (var i = 0; i < dogs.length; i++) {
@@ -1072,7 +1094,7 @@ const Components = {
     },
 
     breedingPage: function() {
-        var dogs = KennelData.getDogs().filter(function(dog) { return dog.gender === 'Female'; });
+        var dogs = KennelData.getOperationalDogs().filter(function(dog) { return dog.gender === 'Female'; });
         var cardsHtml = '';
 
         for (var i = 0; i < dogs.length; i++) {
@@ -1111,7 +1133,7 @@ const Components = {
 
     dailyReportPage: function() {
         var reports = KennelData.getDailyReports();
-        var dogs = KennelData.getDogs();
+        var dogs = KennelData.getOperationalDogs();
         var puppies = KennelData.getPuppies();
         var dogOptionsHtml = '';
         var puppyOptionsHtml = '';
@@ -1411,7 +1433,8 @@ const Components = {
         }
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-dog"></i> Kennel overview</h3></div><div class="card-body"><div class="detail-info-grid">' +
-            '<div class="detail-info-item"><label>Dogs</label><p>' + KennelData.getDogs().length + '</p></div>' +
+            '<div class="detail-info-item"><label>Dogs</label><p>' + KennelData.getOperationalDogs().length + '</p></div>' +
+            '<div class="detail-info-item"><label>Archived profiles</label><p>' + KennelData.getArchivedDogs().length + '</p></div>' +
             '<div class="detail-info-item"><label>Puppies</label><p>' + KennelData.getPuppies().length + '</p></div>' +
             '<div class="detail-info-item"><label>Alerts</label><p>' + alertsCount + '</p></div>' +
             '<div class="detail-info-item"><label>Upcoming tasks</label><p>' + upcomingCount + '</p></div>' +

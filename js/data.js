@@ -562,6 +562,27 @@ const KennelData = {
 
     getDogs() { return this._dogs.slice(); },
 
+    isArchivedDogStatus(status) {
+        var normalized = String(status || '').trim().toLowerCase();
+        return normalized === 'sold' || normalized === 'deceased';
+    },
+
+    isOperationalDog(dog) {
+        return dog && !this.isArchivedDogStatus(dog.status);
+    },
+
+    getOperationalDogs() {
+        return this._dogs.filter(function(dog) {
+            return this.isOperationalDog(dog);
+        }.bind(this));
+    },
+
+    getArchivedDogs() {
+        return this._dogs.filter(function(dog) {
+            return this.isArchivedDogStatus(dog && dog.status);
+        }.bind(this));
+    },
+
     getPuppies() { return this._puppies.slice(); },
 
     addPuppy(puppy) {
@@ -646,6 +667,52 @@ const KennelData = {
 
     getDog(id) { return this._dogs.find(function(d) { return d.id === id; }); },
 
+    _syncFinanceForDogStatusChange(previousDog, nextDog) {
+        var previousStatus = String((previousDog && previousDog.status) || '').trim().toLowerCase();
+        var nextStatus = String((nextDog && nextDog.status) || '').trim().toLowerCase();
+        if (!nextDog || previousStatus === nextStatus) {
+            return Promise.resolve(0);
+        }
+
+        var amount = 0;
+        var entryType = '';
+        var title = '';
+        var category = '';
+        var notes = '';
+
+        if (nextStatus === 'sold' && previousStatus !== 'sold') {
+            amount = Number(nextDog.price || nextDog.value || 0);
+            entryType = 'sale';
+            title = (nextDog.name || 'Dog') + ' marked as sold';
+            category = 'Dog Sale';
+            notes = 'Auto-generated from dog status update.';
+        } else if (nextStatus === 'deceased' && previousStatus !== 'deceased') {
+            amount = Number(nextDog.value || nextDog.price || 0);
+            entryType = 'expense';
+            title = (nextDog.name || 'Dog') + ' marked as deceased';
+            category = 'Asset Loss';
+            notes = 'Auto-generated from dog status update.';
+        }
+
+        if (!entryType || !(amount > 0)) {
+            return Promise.resolve(0);
+        }
+
+        return this.addFinanceEntry({
+            type: entryType,
+            title: title,
+            category: category,
+            amount: amount,
+            date: new Date().toISOString().slice(0, 10),
+            related: nextDog.name || '',
+            notes: notes
+        }).then(function(result) {
+            return result && result.ok && !result.pending ? 1 : 0;
+        }).catch(function() {
+            return 0;
+        });
+    },
+
     addDog(dog) {
         const tempId = 'd' + Date.now();
         dog.id = tempId;
@@ -667,6 +734,9 @@ const KennelData = {
                 this._addActivity('added', '<strong>' + createdDog.name + '</strong> added to kennel', 'green');
                 this._save();
                 this._notify();
+                return this._syncFinanceForDogStatusChange({ status: 'active' }, createdDog).then(function(financeCount) {
+                    return Object.assign({}, result, { financeUpdated: financeCount > 0 });
+                });
             }
             return result;
         }.bind(this)).catch(function() {
@@ -701,6 +771,9 @@ const KennelData = {
                 this._dogs[idx] = Object.assign({}, this._dogs[idx], result.dog);
                 this._save();
                 this._notify();
+                return this._syncFinanceForDogStatusChange(previous, this._dogs[idx]).then(function(financeCount) {
+                    return Object.assign({}, result, { financeUpdated: financeCount > 0 });
+                });
             }
             return result;
         }.bind(this)).catch(function() {
@@ -1451,7 +1524,7 @@ const KennelData = {
     },
 
     getStats() {
-        var dogs = this._dogs;
+        var dogs = this.getOperationalDogs();
         var total = dogs.length;
         var males = dogs.filter(function(d) { return d.gender === 'Male'; }).length;
         var females = dogs.filter(function(d) { return d.gender === 'Female'; }).length;
