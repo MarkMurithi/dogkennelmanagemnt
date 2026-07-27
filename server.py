@@ -931,7 +931,10 @@ class KennelHandler(BaseHTTPRequestHandler):
                     if record_type != "breeding":
                         raise ValueError(f"{record_type} records require a date.")
         conn = self._connect()
-        existing = conn.execute("SELECT id FROM dogs WHERE id = ?", (dog_id,)).fetchone()
+        existing = conn.execute(
+            "SELECT id, image, attachments, pedigreeCertificate, pedigreeCertificateName FROM dogs WHERE id = ?",
+            (dog_id,),
+        ).fetchone()
         if not existing:
             conn.close()
             raise ValueError("Dog not found.")
@@ -939,6 +942,10 @@ class KennelHandler(BaseHTTPRequestHandler):
         if duplicate:
             conn.close()
             raise ValueError("A dog with this name already exists.")
+        image_value = payload["image"] if "image" in payload else (existing[1] or "")
+        attachments_value = payload["attachments"] if "attachments" in payload else (json.loads(existing[2]) if existing[2] else [])
+        pedigree_certificate_value = payload["pedigreeCertificate"] if "pedigreeCertificate" in payload else (existing[3] or "")
+        pedigree_certificate_name_value = payload["pedigreeCertificateName"] if "pedigreeCertificateName" in payload else (existing[4] or "")
         conn.execute(
             "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, color=?, coat=?, microchip=?, registration=?, ownerName=?, ownerPhone=?, ownerAddress=?, pedigreeNotes=?, pedigreeCertificate=?, pedigreeCertificateName=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
             (
@@ -956,15 +963,15 @@ class KennelHandler(BaseHTTPRequestHandler):
                 payload.get("ownerPhone", ""),
                 payload.get("ownerAddress", ""),
                 payload.get("pedigreeNotes", ""),
-                payload.get("pedigreeCertificate", ""),
-                payload.get("pedigreeCertificateName", ""),
+                pedigree_certificate_value,
+                pedigree_certificate_name_value,
                 payload.get("notes", ""),
                 payload.get("value", ""),
                 int(bool(payload.get("forSale", False))),
                 payload.get("price", ""),
-                payload.get("image", ""),
+                image_value,
                 json.dumps(records),
-                json.dumps(payload.get("attachments") or []),
+                json.dumps(attachments_value or []),
                 dog_id,
             ),
         )
@@ -1927,71 +1934,16 @@ class KennelHandler(BaseHTTPRequestHandler):
                     self._log_audit(user, "submit_pending_dog_update", queued.get("approvalId"), f"Submitted dog update for approval: {dog_id}")
                     self._send_json(200, queued)
                     return
-                name = str(payload.get("name", "")).strip()
-                breed = str(payload.get("breed", "")).strip()
-                gender = str(payload.get("gender", "Unknown")).strip() or "Unknown"
-                coat = str(payload.get("coat", "")).strip()
-                if not name or not breed:
-                    self._send_json(400, {"ok": False, "error": "A dog name and breed are required."})
+                try:
+                    updated = self._update_dog_record(dog_id, payload)
+                except ValueError as exc:
+                    error_text = str(exc)
+                    status = 409 if "already exists" in error_text.lower() else 400
+                    self._send_json(status, {"ok": False, "error": error_text})
                     return
-                records = payload.get("records") or {"health": [], "vaccination": [], "deworming": [], "breeding": [], "heatCycle": [], "training": []}
-                if not isinstance(records, dict):
-                    self._send_json(400, {"ok": False, "error": "Dog records must be provided as an object."})
-                    return
-                for record_type, entries in records.items():
-                    if not isinstance(entries, list):
-                        continue
-                    for entry in entries:
-                        if not isinstance(entry, dict):
-                            continue
-                        date_field = "date"
-                        if record_type == "heatCycle":
-                            date_field = "startDate"
-                        if record_type == "breeding" and not entry.get("expectedDate") and not entry.get("date"):
-                            self._send_json(400, {"ok": False, "error": f"{record_type} records require a date."})
-                            return
-                        if not entry.get(date_field):
-                            if record_type != "breeding":
-                                self._send_json(400, {"ok": False, "error": f"{record_type} records require a date."})
-                                return
-                conn = self._connect()
-                duplicate = conn.execute("SELECT id FROM dogs WHERE LOWER(name)=? AND id!=?", (name.lower(), dog_id)).fetchone()
-                if duplicate:
-                    conn.close()
-                    self._send_json(409, {"ok": False, "error": "A dog with this name already exists."})
-                    return
-                conn.execute(
-                    "UPDATE dogs SET name=?, breed=?, gender=?, dob=?, status=?, weight=?, color=?, coat=?, microchip=?, registration=?, ownerName=?, ownerPhone=?, ownerAddress=?, pedigreeNotes=?, notes=?, value=?, forSale=?, price=?, image=?, records=?, attachments=? WHERE id=?",
-                    (
-                        name,
-                        breed,
-                        gender,
-                        payload.get("dob"),
-                        payload.get("status", "Active"),
-                        payload.get("weight", ""),
-                        payload.get("color", ""),
-                        coat,
-                        payload.get("microchip", ""),
-                        payload.get("registration", ""),
-                        payload.get("ownerName", ""),
-                        payload.get("ownerPhone", ""),
-                        payload.get("ownerAddress", ""),
-                        payload.get("pedigreeNotes", ""),
-                        payload.get("notes", ""),
-                        payload.get("value", ""),
-                        int(bool(payload.get("forSale", False))),
-                        payload.get("price", ""),
-                        payload.get("image", ""),
-                        json.dumps(records),
-                        json.dumps(payload.get("attachments") or []),
-                        dog_id,
-                    ),
-                )
-                conn.commit()
-                conn.close()
                 self._create_backup_safe(label="Auto-export", source="auto")
-                self._log_audit(user, "update_dog", dog_id, f"Updated dog {name}")
-                self._send_json(200, {"ok": True, "dog": {**payload, "name": name, "breed": breed, "gender": gender, "coat": coat}})
+                self._log_audit(user, "update_dog", dog_id, f"Updated dog {updated.get('name')}")
+                self._send_json(200, {"ok": True, "dog": {**payload, **updated}})
                 return
             if user.get("role") == "staff":
                 queued = self._queue_staff_submission(

@@ -1369,6 +1369,7 @@ const App = {
     showAddDog() {
         if (!this._requireEditAccess()) return;
         this.editingDogId = null;
+        this.editingDogOriginal = null;
         document.getElementById('dogModalTitle').textContent = 'Add New Dog';
         document.getElementById('dogForm').reset();
         document.getElementById('dogId').value = '';
@@ -1395,6 +1396,12 @@ const App = {
         this.editingDogId = dogId;
         const dog = KennelData.getDog(dogId);
         if (!dog) return;
+        this.editingDogOriginal = {
+            image: dog.image || '',
+            attachments: Array.isArray(dog.attachments) ? dog.attachments.slice() : [],
+            pedigreeCertificate: dog.pedigreeCertificate || '',
+            pedigreeCertificateName: dog.pedigreeCertificateName || ''
+        };
 
         document.getElementById('dogModalTitle').textContent = 'Edit Dog';
         document.getElementById('dogId').value = dog.id;
@@ -1533,6 +1540,15 @@ const App = {
             setSaving(true);
 
             const saveDog = (imageValue, attachments, pedigreeCertificateValue, pedigreeCertificateNameValue) => {
+                const dogId = document.getElementById('dogId').value;
+                const isEdit = !!dogId;
+                const original = this.editingDogOriginal || { image: '', attachments: [], pedigreeCertificate: '', pedigreeCertificateName: '' };
+                const typedImageValue = document.getElementById('dogImage').value.trim();
+                const resolvedImageValue = imageValue || typedImageValue;
+                const hasNewAttachments = Array.isArray(attachments) && attachments.length > 0 && attachments !== this.existingDogAttachments;
+                const hasImageChanged = !isEdit || hasNewAttachments || resolvedImageValue !== (original.image || '');
+                const hasNewPedigree = typeof pedigreeCertificateValue !== 'undefined';
+
                 const dogData = {
                     name: document.getElementById('dogName').value.trim(),
                     breed: document.getElementById('dogBreed').value.trim(),
@@ -1547,18 +1563,24 @@ const App = {
                     ownerPhone: document.getElementById('dogOwnerPhone').value.trim(),
                     ownerAddress: document.getElementById('dogOwnerAddress').value.trim(),
                     pedigreeNotes: document.getElementById('dogPedigreeNotes').value.trim(),
-                    pedigreeCertificate: pedigreeCertificateValue || document.getElementById('dogPedigreeCertificateData').value || '',
-                    pedigreeCertificateName: pedigreeCertificateNameValue || document.getElementById('dogPedigreeCertificateName').value || '',
                     status: document.getElementById('dogStatus').value,
                     forSale: document.getElementById('dogForSale').checked,
                     value: parseFloat(document.getElementById('dogValue').value) || null,
                     price: document.getElementById('dogForSale').checked ? (parseFloat(document.getElementById('dogPrice').value) || null) : null,
-                    notes: document.getElementById('dogNotes').value.trim(),
-                    image: imageValue || document.getElementById('dogImage').value.trim(),
-                    attachments: attachments || []
+                    notes: document.getElementById('dogNotes').value.trim()
                 };
 
-                const dogId = document.getElementById('dogId').value;
+                if (!isEdit || hasImageChanged) {
+                    dogData.image = resolvedImageValue;
+                }
+                if (!isEdit || hasNewAttachments) {
+                    dogData.attachments = attachments || [];
+                }
+                if (!isEdit || hasNewPedigree) {
+                    dogData.pedigreeCertificate = pedigreeCertificateValue || '';
+                    dogData.pedigreeCertificateName = pedigreeCertificateNameValue || '';
+                }
+
                 const savePromise = dogId ? KennelData.updateDog(dogId, dogData) : KennelData.addDog(dogData);
                 savePromise.then((result) => {
                     setSaving(false);
