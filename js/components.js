@@ -1444,7 +1444,7 @@ const Components = {
 
         var dataHidden = KennelData.getDataHidden();
         var hideStatusBadge = dataHidden
-            ? '<span class="status-pill deceased"><i class="fas fa-eye-slash"></i> Data is hidden from staff &amp; reviewers</span>'
+            ? '<span class="status-pill deceased"><i class="fas fa-eye-slash"></i> Data is hidden from everyone</span>'
             : '<span class="status-pill active"><i class="fas fa-eye"></i> Data is visible to everyone</span>';
         var hideToggleBtn = dataHidden
             ? '<button class="btn btn-secondary" onclick="App.toggleDataVisibility()"><i class="fas fa-eye"></i> Unhide data</button>'
@@ -1460,7 +1460,7 @@ const Components = {
             '<button class="btn btn-secondary" style="margin-top:12px" onclick="App.resetAppData()"><i class="fas fa-trash"></i> Clear all data</button>' +
             '<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--gray-200)">' +
             '<p style="margin-bottom:8px">' + hideStatusBadge + '</p>' +
-            '<p style="color:var(--gray-500);font-size:0.9rem;margin-bottom:10px">Hide dogs, puppies, finance, health records, calendar, daily reports and chat from staff and reviewers so the app looks fresh for demos. Entry forms stay usable for input.</p>' +
+            '<p style="color:var(--gray-500);font-size:0.9rem;margin-bottom:10px">Hide dogs, puppies, finance, health records, calendar, daily reports and chat from all users. Entry forms stay usable for input.</p>' +
             hideToggleBtn +
             '</div></div></div>';
 

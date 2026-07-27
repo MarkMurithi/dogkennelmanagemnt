@@ -1744,7 +1744,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, {"ok": True, "messages": []})
                 return
             since = self.path.split("since=")[-1] if "since=" in self.path else ""
@@ -1868,7 +1868,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT id, name, breed, gender, dob, status, weight, color, coat, microchip, registration, ownerName, ownerPhone, ownerAddress, pedigreeNotes, pedigreeCertificate, pedigreeCertificateName, notes, value, forSale, price, image, records, attachments, createdAt FROM dogs ORDER BY createdAt DESC")
@@ -2005,7 +2005,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT id, name, breed, coat, dob, gender, collarColor, saleStatus, saleTotalAmount, saleReceivedAmount, saleUnpaidAmount, vaccinations, deworming, father, mother, sireGrandfather, sireGrandmother, damGrandfather, damGrandmother, ownerName, ownerPhone, ownerAddress, createdAt FROM puppies ORDER BY createdAt DESC")
@@ -2157,7 +2157,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not self._require_role(user, {"admin", "reviewer"}):
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT * FROM finance ORDER BY date DESC, createdAt DESC")
@@ -2228,7 +2228,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT * FROM events ORDER BY date ASC")
@@ -2240,7 +2240,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all("SELECT id, date, foodRemaining, foodToday, kennelsWashed, dogStatuses, puppyStatuses, puppiesFeeding, visitors, personInCharge, medicationNotes, cleaningChecklist, staffComments, notes, createdAt FROM daily_reports ORDER BY date DESC, createdAt DESC")
@@ -2343,7 +2343,7 @@ class KennelHandler(BaseHTTPRequestHandler):
             user = self._require_auth()
             if not user:
                 return
-            if user.get("role") != "admin" and self._is_data_hidden():
+            if self._is_data_hidden():
                 self._send_json(200, [])
                 return
             rows = self._fetch_all(
