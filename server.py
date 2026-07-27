@@ -134,6 +134,7 @@ def init_db():
     ]:
         try:
             conn.execute(f"ALTER TABLE dogs ADD COLUMN {column_name} TEXT")
+            conn.commit()
         except Exception as exc:
             conn.rollback()
             if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
@@ -178,6 +179,7 @@ def init_db():
     for column_name in ["breed", "coat"]:
         try:
             conn.execute(f"ALTER TABLE puppies ADD COLUMN {column_name} TEXT")
+            conn.commit()
         except Exception as exc:
             conn.rollback()
             if "duplicate column" not in str(exc).lower() and "already exists" not in str(exc).lower():
