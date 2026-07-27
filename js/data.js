@@ -106,7 +106,20 @@ const KennelData = {
         const timeoutId = controller ? setTimeout(function() { controller.abort(); }, 45000) : null;
         return fetch(this.apiBase + path, config).then(function(response) {
             if (timeoutId) clearTimeout(timeoutId);
-            return response.json().catch(function() { return {}; }).then(function(data) {
+            return response.text().then(function(text) {
+                var data = {};
+                if (text) {
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        data = { error: text.slice(0, 300) };
+                    }
+                }
+                if (!response.ok && (!data || typeof data !== 'object' || !data.error)) {
+                    data = Object.assign({}, data || {}, {
+                        error: 'Request failed with status ' + response.status + (response.statusText ? (' (' + response.statusText + ')') : '')
+                    });
+                }
                 return {
                     ok: response.ok,
                     status: response.status,
@@ -154,6 +167,11 @@ const KennelData = {
 
             if (!result.ok && queuedWriteId && result.status >= 400 && result.status < 500) {
                 this._removePendingWrite(queuedWriteId);
+            }
+
+            if (!result.ok) {
+                var fallbackError = result.error || ('Request failed with status ' + result.status);
+                return Object.assign({ ok: false, error: fallbackError }, result.data || {});
             }
 
             return result.data || {};
