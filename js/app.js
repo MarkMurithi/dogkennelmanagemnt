@@ -678,6 +678,8 @@ const App = {
                     const editingPuppyId = (puppyIdInput && puppyIdInput.value) ? puppyIdInput.value : this.editingPuppyId;
                     const puppyData = {
                         name: document.getElementById('puppyName').value.trim(),
+                        breed: document.getElementById('puppyBreed').value.trim(),
+                        coat: document.getElementById('puppyCoat').value,
                         dob: document.getElementById('puppyDob').value || null,
                         gender: document.getElementById('puppyGender').value,
                         collarColor: document.getElementById('puppyCollarColor').value.trim(),
@@ -1779,8 +1781,12 @@ const App = {
         if (puppyIdInput) puppyIdInput.value = puppy.id || '';
         const puppyName = document.getElementById('puppyName');
         if (puppyName) puppyName.value = puppy.name || '';
+        const puppyBreed = document.getElementById('puppyBreed');
+        if (puppyBreed) puppyBreed.value = puppy.breed || '';
         const puppyDob = document.getElementById('puppyDob');
         if (puppyDob) puppyDob.value = puppy.dob || '';
+        const puppyCoat = document.getElementById('puppyCoat');
+        if (puppyCoat) puppyCoat.value = puppy.coat || '';
         const puppyGender = document.getElementById('puppyGender');
         if (puppyGender) puppyGender.value = puppy.gender || '';
         const puppyCollarColor = document.getElementById('puppyCollarColor');

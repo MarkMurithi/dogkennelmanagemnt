@@ -1545,6 +1545,8 @@ const Components = {
                     '<h4><i class="fas fa-id-badge"></i> Identity</h4>' +
                     '<div class="detail-info-grid">' +
                     '<div class="detail-info-item"><label>Name</label><p>' + (puppy.name || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Breed</label><p>' + (puppy.breed || 'N/A') + '</p></div>' +
+                    '<div class="detail-info-item"><label>Coat</label><p>' + (puppy.coat || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Date of Birth</label><p>' + (puppy.dob ? new Date(puppy.dob).toLocaleDateString() : 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Gender</label><p>' + (puppy.gender || 'N/A') + '</p></div>' +
                     '<div class="detail-info-item"><label>Collar Colour</label><p>' + (puppy.collarColor || 'N/A') + '</p></div>' +
@@ -1592,7 +1594,11 @@ const Components = {
                   '<input type="hidden" id="puppyId" value="">' +
                   '<div class="form-row">' +
                   '<div class="form-group half"><label for="puppyName">Name *</label><input type="text" id="puppyName" required></div>' +
+                  '<div class="form-group half"><label for="puppyBreed">Breed</label><input type="text" id="puppyBreed" placeholder="e.g. German Shepherd"></div>' +
+                  '</div>' +
+                  '<div class="form-row">' +
                   '<div class="form-group half"><label for="puppyDob">Date of Birth</label><input type="date" id="puppyDob"></div>' +
+                  '<div class="form-group half"><label for="puppyCoat">Coat</label><select id="puppyCoat"><option value="">Select...</option><option value="Long coat">Long coat</option><option value="Short coat">Short coat</option></select></div>' +
                   '</div>' +
                   '<div class="form-row">' +
                   '<div class="form-group half"><label for="puppyGender">Gender *</label><select id="puppyGender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option></select></div>' +
