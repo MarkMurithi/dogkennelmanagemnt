@@ -1927,6 +1927,15 @@ class KennelHandler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self._send_json(400, {"ok": False, "error": str(exc)})
                 return
+            except DatabaseIntegrityError as exc:
+                self._send_json(409, {"ok": False, "error": f"Dog record conflict: {exc}"})
+                return
+            except DatabaseOperationalError as exc:
+                self._send_json(500, {"ok": False, "error": f"Dog database error: {exc}"})
+                return
+            except Exception as exc:
+                self._send_json(500, {"ok": False, "error": f"Dog save failed: {exc}"})
+                return
             self._create_backup_safe(label="Auto-export", source="auto")
             self._log_audit(user, "create_dog", created.get("id"), f"Created dog {created.get('name')}")
             self._send_json(200, {"ok": True, "dog": {**payload, **created}})
@@ -1956,6 +1965,15 @@ class KennelHandler(BaseHTTPRequestHandler):
                     error_text = str(exc)
                     status = 409 if "already exists" in error_text.lower() else 400
                     self._send_json(status, {"ok": False, "error": error_text})
+                    return
+                except DatabaseIntegrityError as exc:
+                    self._send_json(409, {"ok": False, "error": f"Dog update conflict: {exc}"})
+                    return
+                except DatabaseOperationalError as exc:
+                    self._send_json(500, {"ok": False, "error": f"Dog database error: {exc}"})
+                    return
+                except Exception as exc:
+                    self._send_json(500, {"ok": False, "error": f"Dog update failed: {exc}"})
                     return
                 self._create_backup_safe(label="Auto-export", source="auto")
                 self._log_audit(user, "update_dog", dog_id, f"Updated dog {updated.get('name')}")
