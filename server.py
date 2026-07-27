@@ -7,6 +7,7 @@ import secrets
 import sys
 import threading
 import time
+import traceback
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -1354,7 +1355,7 @@ class KennelHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         if path.startswith("/api"):
-            self._handle_api(path, parsed.query, "GET", None)
+            self._safe_handle_api(path, parsed.query, "GET", None)
             return
         self._serve_static(path)
 
@@ -1362,7 +1363,7 @@ class KennelHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         if path.startswith("/api"):
-            self._handle_api(path, parsed.query, "POST", self._read_body())
+            self._safe_handle_api(path, parsed.query, "POST", self._read_body())
             return
         self._send_json(404, {"ok": False, "error": "Not found"})
 
@@ -1370,7 +1371,7 @@ class KennelHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         if path.startswith("/api"):
-            self._handle_api(path, parsed.query, "PUT", self._read_body())
+            self._safe_handle_api(path, parsed.query, "PUT", self._read_body())
             return
         self._send_json(404, {"ok": False, "error": "Not found"})
 
@@ -1378,9 +1379,21 @@ class KennelHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         if path.startswith("/api"):
-            self._handle_api(path, parsed.query, "DELETE", None)
+            self._safe_handle_api(path, parsed.query, "DELETE", None)
             return
         self._send_json(404, {"ok": False, "error": "Not found"})
+
+    def _safe_handle_api(self, path, query, method, body):
+        try:
+            self._handle_api(path, query, method, body)
+        except Exception as exc:
+            print(f"Unhandled API error on {method} {path}: {exc}", file=sys.stderr)
+            traceback.print_exc()
+            try:
+                self._send_json(500, {"ok": False, "error": "Internal server error. Check server logs for details."})
+            except Exception:
+                # If headers/body have already been partially written, avoid a secondary crash.
+                pass
 
     def _handle_api(self, path, query, method, body):
         if path == "/api/health":
