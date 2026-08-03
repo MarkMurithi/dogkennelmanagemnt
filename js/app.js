@@ -1885,11 +1885,41 @@ const App = {
         return this.listViewState[key];
     },
 
+    _refreshOpenDogDetailPanel() {
+        if (!this.currentDogId) return false;
+        const overlay = document.getElementById('dogDetailOverlay');
+        if (!overlay) return false;
+
+        const activeTab = overlay.querySelector('.records-tab.active')?.dataset.tab || null;
+        const bodyEl = overlay.querySelector('.dog-profile-body');
+        const bodyScrollTop = bodyEl ? bodyEl.scrollTop : 0;
+        const dog = KennelData.getDog(this.currentDogId);
+        if (!dog) return false;
+
+        overlay.remove();
+        document.body.insertAdjacentHTML('beforeend', Components.dogDetailPanel(dog));
+        document.body.classList.add('modal-open');
+        this.setupDetailTabs();
+
+        if (activeTab) {
+            const tab = document.querySelector('#dogDetailOverlay .records-tab[data-tab="' + activeTab + '"]');
+            if (tab) tab.click();
+        }
+
+        const nextBodyEl = document.querySelector('#dogDetailOverlay .dog-profile-body');
+        if (nextBodyEl) nextBodyEl.scrollTop = bodyScrollTop;
+        return true;
+    },
+
     showMoreList(key) {
         if (!key) return;
         const step = this.listPageSizes[key] || this.listPageSizes.default || 12;
         const current = this._getListVisibleCount(key, step);
         this.listViewState[key] = current + step;
+        const isDogDetailList = typeof key === 'string' && (key.indexOf('dogRecord_') === 0 || key.indexOf('dogHealthTimeline_') === 0);
+        if (isDogDetailList && this._refreshOpenDogDetailPanel()) {
+            return;
+        }
         this.render();
     },
 
@@ -1897,6 +1927,10 @@ const App = {
         if (!key) return;
         const base = this.listPageSizes[key] || this.listPageSizes.default || 12;
         this.listViewState[key] = base;
+        const isDogDetailList = typeof key === 'string' && (key.indexOf('dogRecord_') === 0 || key.indexOf('dogHealthTimeline_') === 0);
+        if (isDogDetailList && this._refreshOpenDogDetailPanel()) {
+            return;
+        }
         this.render();
     },
 
