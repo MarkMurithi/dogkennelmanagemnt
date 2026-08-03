@@ -579,7 +579,8 @@ const KennelData = {
                     personInCharge: report.personInCharge || '',
                     healthStatus: status.healthStatus || '',
                     medication: status.medication || '',
-                    notes: report.notes || ''
+                    notes: report.notes || '',
+                    cleared: this._isClearedStatusEntry(status)
                 });
             }
         }
@@ -602,7 +603,8 @@ const KennelData = {
                 personInCharge: update.personInCharge || '',
                 healthStatus: update.healthStatus || '',
                 medication: update.medication || '',
-                notes: ''
+                notes: '',
+                cleared: this._isClearedStatusEntry(update)
             });
         }
 
@@ -1831,7 +1833,8 @@ const KennelData = {
                     healthStatus: status.healthStatus || '',
                     groomingStatus: status.groomingStatus || '',
                     medication: status.medication || '',
-                    notes: report.notes || ''
+                    notes: report.notes || '',
+                    cleared: this._isClearedStatusEntry(status)
                 });
             }
         }
@@ -1855,7 +1858,8 @@ const KennelData = {
                 healthStatus: update.healthStatus || '',
                 groomingStatus: update.groomingStatus || '',
                 medication: update.medication || '',
-                notes: ''
+                notes: '',
+                cleared: this._isClearedStatusEntry(update)
             });
         }
 
