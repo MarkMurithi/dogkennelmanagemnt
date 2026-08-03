@@ -321,9 +321,13 @@ const Components = {
         }
 
         var timelineKey = 'dogHealthTimeline_' + dog.id;
+        var timelineDefaultCount = 5;
+        if (typeof App !== 'undefined' && App.listPageSizes && !App.listPageSizes[timelineKey]) {
+            App.listPageSizes[timelineKey] = timelineDefaultCount;
+        }
         var visibleTimelineCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
-            ? App._getListVisibleCount(timelineKey, 12)
-            : 12;
+            ? App._getListVisibleCount(timelineKey, timelineDefaultCount)
+            : timelineDefaultCount;
         var visibleTimelineEntries = timelineEntries.slice(0, visibleTimelineCount);
 
         for (var j = 0; j < visibleTimelineEntries.length; j++) {
