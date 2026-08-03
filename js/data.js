@@ -14,11 +14,12 @@ const KennelData = {
     _maxUsers: 20,
     _dataHidden: false,
     _dogStatusUpdates: [],
+    _puppyStatusUpdates: [],
     _serverState: { status: 'online', message: '' },
     _listeners: [],
     _pendingWrites: [],
     _isFlushingPendingWrites: false,
-    _DATA_VERSION: 14,
+    _DATA_VERSION: 15,
     apiBase: (function() {
         if (typeof window === 'undefined' || !window.location) {
             return 'http://127.0.0.1:8001/api';
@@ -46,7 +47,7 @@ const KennelData = {
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                if (parsed._version === this._DATA_VERSION || parsed._version === 13 || parsed._version === 12 || parsed._version === 10 || parsed._version === 9) {
+                if (parsed._version === this._DATA_VERSION || parsed._version === 14 || parsed._version === 13 || parsed._version === 12 || parsed._version === 10 || parsed._version === 9) {
                     this._dogs = parsed.dogs || [];
                     this._puppies = parsed.puppies || [];
                     this._activities = parsed.activities || [];
@@ -57,6 +58,7 @@ const KennelData = {
                     this._pendingApprovals = Array.isArray(parsed.pendingApprovals) ? parsed.pendingApprovals : [];
                     this._mySubmissions = Array.isArray(parsed.mySubmissions) ? parsed.mySubmissions : [];
                     this._dogStatusUpdates = Array.isArray(parsed.dogStatusUpdates) ? parsed.dogStatusUpdates : [];
+                    this._puppyStatusUpdates = Array.isArray(parsed.puppyStatusUpdates) ? parsed.puppyStatusUpdates : [];
                     this._currentUser = parsed.currentUser || this._restoreAuthState();
                 } else {
                     this._resetEmptyState();
@@ -450,6 +452,108 @@ const KennelData = {
         });
     },
 
+    addPuppyStatusUpdate(entry) {
+        return this._request('/puppy-status-updates', {
+            method: 'POST',
+            body: JSON.stringify(entry || {})
+        }).then(function(result) {
+            if (!result || !result.ok) {
+                return result || { ok: false, error: 'Unable to save puppy health status right now.' };
+            }
+            if (result.update) {
+                this._puppyStatusUpdates.unshift(result.update);
+                this._save();
+            }
+            return result;
+        }.bind(this)).catch(function() {
+            return { ok: false, error: 'Unable to save puppy health status right now.' };
+        });
+    },
+
+    getPuppyDailyHealthStatuses(puppyId, puppyName) {
+        var reports = this.getDailyReports();
+        var normalizedName = (puppyName || '').toLowerCase().trim();
+        var entries = [];
+
+        for (var i = 0; i < reports.length; i++) {
+            var report = reports[i] || {};
+            var statuses = Array.isArray(report.puppyStatuses) ? report.puppyStatuses : [];
+            for (var j = 0; j < statuses.length; j++) {
+                var status = statuses[j] || {};
+                var statusName = (status.puppyName || '').toLowerCase().trim();
+                var matchesId = status.puppyId && puppyId && status.puppyId === puppyId;
+                var matchesName = normalizedName && statusName && statusName === normalizedName;
+
+                if (!matchesId && !matchesName) {
+                    continue;
+                }
+
+                entries.push({
+                    reportId: report.id || '',
+                    reportDate: report.date || '',
+                    createdAt: report.createdAt || '',
+                    personInCharge: report.personInCharge || '',
+                    healthStatus: status.healthStatus || '',
+                    medication: status.medication || '',
+                    notes: report.notes || ''
+                });
+            }
+        }
+
+        var quickUpdates = this._puppyStatusUpdates || [];
+        for (var q = 0; q < quickUpdates.length; q++) {
+            var update = quickUpdates[q] || {};
+            var updateName = (update.puppyName || '').toLowerCase().trim();
+            var updateMatchesId = update.puppyId && puppyId && update.puppyId === puppyId;
+            var updateMatchesName = normalizedName && updateName && updateName === normalizedName;
+
+            if (!updateMatchesId && !updateMatchesName) {
+                continue;
+            }
+
+            entries.push({
+                reportId: '',
+                reportDate: update.createdAt || '',
+                createdAt: update.createdAt || '',
+                personInCharge: update.personInCharge || '',
+                healthStatus: update.healthStatus || '',
+                medication: update.medication || '',
+                notes: ''
+            });
+        }
+
+        entries.sort(function(a, b) {
+            var aDate = new Date(a.reportDate || a.createdAt || 0);
+            var bDate = new Date(b.reportDate || b.createdAt || 0);
+            return bDate - aDate;
+        });
+
+        return entries;
+    },
+
+    getPuppyCurrentHealthStatus(puppyId, puppyName) {
+        var entries = this.getPuppyDailyHealthStatuses(puppyId, puppyName);
+        var chronological = entries.slice().reverse();
+        var current = null;
+
+        for (var i = 0; i < chronological.length; i++) {
+            var entry = chronological[i];
+            if (!entry.healthStatus) continue;
+
+            var isGood = entry.healthStatus === 'Good';
+            var currentIsGoodOrEmpty = !current || current.healthStatus === 'Good';
+
+            if (isGood || currentIsGoodOrEmpty) {
+                current = entry;
+            }
+        }
+
+        return {
+            entry: current,
+            needsWatch: !!(current && current.healthStatus && current.healthStatus !== 'Good')
+        };
+    },
+
     _resetEmptyState() {
         this._dogs = [];
         this._puppies = [];
@@ -461,6 +565,7 @@ const KennelData = {
         this._pendingApprovals = [];
         this._mySubmissions = [];
         this._dogStatusUpdates = [];
+        this._puppyStatusUpdates = [];
         this._submissionStatusCache = {};
         this._currentUser = null;
         this._save();

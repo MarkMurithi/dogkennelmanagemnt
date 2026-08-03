@@ -1145,11 +1145,108 @@ const Components = {
             '</section>' +
             '<div class="section-header"><h2><i class="fas fa-heartbeat"></i> Health Records</h2><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="section-badge"><i class="fas fa-notes-medical"></i> Vet history</div>' +
             (KennelData.getCurrentUserRole() !== 'reviewer'
-                ? '<button class="btn btn-primary btn-sm" onclick="App.showLogHealthStatusModal()"><i class="fas fa-stethoscope"></i> Log health status</button>'
-                : '') +
+                ? '<button class="btn btn-primary btn-sm" onclick="App.showLogHealthStatusModal()"><i class="fas fa-stethoscope"></i> Log health status</button>' +
+                  '<button class="btn btn-secondary btn-sm" onclick="App.navigate(\'puppyhealth\')"><i class="fas fa-paw"></i> Puppies</button>'
+                : '<button class="btn btn-secondary btn-sm" onclick="App.navigate(\'puppyhealth\')"><i class="fas fa-paw"></i> Puppies</button>') +
             '</div></div>' +
             '<div class="content-grid">' + cardsHtml + '</div>' +
             healthControlsHtml +
+            '</div>';
+    },
+
+    puppyHealthRecordsPage: function() {
+        var puppies = KennelData.getPuppies();
+        var puppyCards = [];
+
+        for (var i = 0; i < puppies.length; i++) {
+            var puppy = puppies[i];
+            var healthStatuses = KennelData.getPuppyDailyHealthStatuses(puppy.id, puppy.name);
+            var currentHealthStatus = KennelData.getPuppyCurrentHealthStatus(puppy.id, puppy.name);
+            var entries = [];
+            var recordsHtml = '';
+            var latestTimestamp = 0;
+
+            if (currentHealthStatus.entry) {
+                var curStatus = currentHealthStatus.entry;
+                var curDetails = ['Health: ' + curStatus.healthStatus];
+                if (curStatus.medication) curDetails.push('Medication: ' + curStatus.medication);
+                if (curStatus.personInCharge) curDetails.push('By: ' + curStatus.personInCharge);
+                entries.push({
+                    date: curStatus.reportDate || curStatus.createdAt || '',
+                    title: 'Current health status',
+                    details: curDetails.join(' • '),
+                    pinned: true,
+                    alert: currentHealthStatus.needsWatch
+                });
+            }
+
+            for (var j = 0; j < healthStatuses.length; j++) {
+                var status = healthStatuses[j];
+                if (status.healthStatus && currentHealthStatus.entry && status.reportDate === currentHealthStatus.entry.reportDate && status.createdAt === currentHealthStatus.entry.createdAt && status.healthStatus === currentHealthStatus.entry.healthStatus) {
+                    continue;
+                }
+                var details = [];
+                if (status.healthStatus) details.push('Health: ' + status.healthStatus);
+                if (status.medication) details.push('Medication: ' + status.medication);
+                if (status.personInCharge) details.push('By: ' + status.personInCharge);
+                entries.push({
+                    date: status.reportDate || status.createdAt || '',
+                    title: 'Daily health status',
+                    details: details.join(' • ') || 'No details logged'
+                });
+            }
+
+            for (var e = 0; e < entries.length; e++) {
+                var entryTime = entries[e].date ? new Date(entries[e].date).getTime() : 0;
+                if (!isNaN(entryTime) && entryTime > latestTimestamp) latestTimestamp = entryTime;
+            }
+
+            entries.sort(function(a, b) {
+                if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                return new Date(b.date || 0) - new Date(a.date || 0);
+            });
+            if (entries.length === 0) {
+                recordsHtml = '<p style="color:var(--gray-400)">No puppy health records yet.</p>';
+            } else {
+                for (var m = 0; m < entries.length; m++) {
+                    var entry = entries[m];
+                    var entryClass = 'alert-item' + (entry.alert ? ' health-alert-pinned' : '');
+                    var alertBadge = entry.alert ? ' <span class="health-alert-badge"><i class="fas fa-exclamation-triangle"></i> Needs watch</span>' : '';
+                    recordsHtml += '<div class="' + entryClass + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                        '<div class="alert-content">' +
+                        '<h4>' + entry.title + alertBadge + '</h4>' +
+                        '<p>' + entry.details + '</p>' +
+                        '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
+                        '</div></div>';
+                }
+            }
+
+            puppyCards.push({ latestTimestamp: latestTimestamp, html: '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-paw"></i> ' + this.escapeHtml(puppy.name || 'Puppy') + '</h3></div><div class="card-body">' + recordsHtml + '</div></div>' });
+        }
+
+        puppyCards.sort(function(a, b) { return b.latestTimestamp - a.latestTimestamp; });
+        var visiblePuppyCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('puppyHealth', (App.listPageSizes && App.listPageSizes.healthDogs) || 10)
+            : 10;
+        var visiblePuppyCards = puppyCards.slice(0, visiblePuppyCount);
+        var cardsHtml = visiblePuppyCards.map(function(item) { return item.html; }).join('');
+        var puppyHealthControlsHtml = this.listControls(puppyCards.length, visiblePuppyCards.length, 'puppyHealth', 'puppy');
+
+        if (!cardsHtml) {
+            cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-paw" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No puppies found</p></div>';
+        }
+
+        return '<div class="page-shell" id="pagePuppyHealth">' +
+            '<section class="page-hero">' +
+            '<div><div class="hero-badge"><i class="fas fa-paw"></i> Puppy health tracking</div><h2>Record puppy health milestones</h2><p>Track puppy wellness updates in the same way as dog health records.</p></div>' +
+            '</section>' +
+            '<div class="section-header"><h2><i class="fas fa-paw"></i> Puppy Health Records</h2><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="section-badge"><i class="fas fa-notes-medical"></i> Puppy health</div>' +
+            (KennelData.getCurrentUserRole() !== 'reviewer'
+                ? '<button class="btn btn-primary btn-sm" onclick="App.showLogPuppyHealthStatusModal()"><i class="fas fa-stethoscope"></i> Log puppy health status</button>'
+                : '') +
+            '</div></div>' +
+            '<div class="content-grid">' + cardsHtml + '</div>' +
+            puppyHealthControlsHtml +
             '</div>';
     },
 

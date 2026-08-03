@@ -54,6 +54,7 @@ const App = {
         this.setupInvoiceModal();
         this.setupDailyReportDetailModal();
         this.setupHealthStatusModal();
+        this.setupPuppyHealthStatusModal();
         this.render();
 
         // Subscribe to data changes. Renders are scheduled (coalesced) rather than
@@ -1412,6 +1413,9 @@ const App = {
             case 'health':
                 main.innerHTML = Components.healthRecordsPage();
                 break;
+            case 'puppyhealth':
+                main.innerHTML = Components.puppyHealthRecordsPage();
+                break;
             case 'breeding':
                 main.innerHTML = Components.breedingPage();
                 break;
@@ -1848,6 +1852,24 @@ const App = {
         healthSelect.value = '';
         modal.classList.add('open');
         window.history.pushState({ page: this.currentPage, modal: 'healthStatusModal' }, '', window.location.pathname + window.location.search);
+    },
+
+    showLogPuppyHealthStatusModal() {
+        if (!this._requireEditAccess()) return;
+        const puppySelect = document.getElementById('puppyHealthStatusPuppyId');
+        const healthSelect = document.getElementById('puppyHealthStatusValue');
+        const modal = document.getElementById('puppyHealthStatusModal');
+        if (!puppySelect || !healthSelect || !modal) {
+            Components.toast('Puppy health status form is unavailable. Please refresh the page.', 'error');
+            return;
+        }
+        const puppies = KennelData.getPuppies();
+        puppySelect.innerHTML = puppies.length
+            ? puppies.map(puppy => '<option value="' + puppy.id + '">' + Components.escapeHtml(puppy.name || 'Puppy') + '</option>').join('')
+            : '<option value="">No puppies available</option>';
+        healthSelect.value = '';
+        modal.classList.add('open');
+        window.history.pushState({ page: this.currentPage, modal: 'puppyHealthStatusModal' }, '', window.location.pathname + window.location.search);
     },
 
     setupDetailTabs() {
@@ -2704,9 +2726,57 @@ const App = {
                 }
                 closeModal();
                 if (result.pending) {
-                    Components.toast(result.message || (dogName + '\u2019s health status submitted for admin approval.'));
+                    Components.toast(result.message || (dogName + '’s health status submitted for admin approval.'));
                 } else {
-                    Components.toast(dogName + '\u2019s health status logged');
+                    Components.toast(dogName + '’s health status logged');
+                }
+                this.render();
+            });
+        });
+    },
+
+    setupPuppyHealthStatusModal() {
+        const modal = document.getElementById('puppyHealthStatusModal');
+        const closeModal = () => { if (modal) modal.classList.remove('open'); };
+
+        document.getElementById('puppyHealthStatusModalCancel').addEventListener('click', closeModal);
+        document.getElementById('puppyHealthStatusModalClose').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        document.getElementById('puppyHealthStatusModalSave').addEventListener('click', () => {
+            const puppySelect = document.getElementById('puppyHealthStatusPuppyId');
+            const healthSelect = document.getElementById('puppyHealthStatusValue');
+            if (!puppySelect || !puppySelect.value) {
+                Components.toast('Please select a puppy first.', 'error');
+                return;
+            }
+            if (!healthSelect || !healthSelect.value) {
+                Components.toast('Please select a health status.', 'error');
+                return;
+            }
+            const puppyId = puppySelect.value;
+            const puppyName = puppySelect.options[puppySelect.selectedIndex]?.text || 'Puppy';
+            const healthValue = healthSelect.value;
+            const currentUser = KennelData.getCurrentUser();
+
+            KennelData.addPuppyStatusUpdate({
+                puppyId: puppyId,
+                puppyName: puppyName,
+                healthStatus: healthValue,
+                medication: '',
+                personInCharge: currentUser ? currentUser.name : ''
+            }).then((result) => {
+                if (!result || !result.ok) {
+                    Components.toast((result && result.error) || 'Unable to save puppy health status right now.', 'error');
+                    return;
+                }
+                closeModal();
+                if (result.pending) {
+                    Components.toast(result.message || (puppyName + '’s health status submitted for admin approval.'));
+                } else {
+                    Components.toast(puppyName + '’s health status logged');
                 }
                 this.render();
             });

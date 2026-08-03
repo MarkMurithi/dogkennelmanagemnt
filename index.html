@@ -184,6 +184,36 @@
         </div>
     </div>
 
+    <!-- Puppy Health Status Modal -->
+    <div class="modal-overlay" id="puppyHealthStatusModal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <h2>Log Puppy Health Status</h2>
+                <button class="modal-close" id="puppyHealthStatusModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="puppyHealthStatusForm">
+                    <div class="form-group">
+                        <label for="puppyHealthStatusPuppyId">Puppy *</label>
+                        <select id="puppyHealthStatusPuppyId"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="puppyHealthStatusValue">Health status *</label>
+                        <select id="puppyHealthStatusValue">
+                            <option value="">Select...</option>
+                            <option value="Good">Good</option>
+                            <option value="Needs Watch">Needs Watch</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="puppyHealthStatusModalCancel">Cancel</button>
+                <button class="btn btn-primary" id="puppyHealthStatusModalSave">Save status</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Record Modal -->
     <div class="modal-overlay" id="recordModal">
         <div class="modal">
