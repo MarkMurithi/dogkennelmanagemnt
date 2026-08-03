@@ -23,6 +23,22 @@ const App = {
     calendarViewMonth: null,
     calendarSelectedDate: null,
     lastFinanceSnapshot: null,
+    listViewState: {},
+    listPageSizes: {
+        default: 12,
+        myDogsActive: 12,
+        myDogsArchived: 12,
+        puppies: 10,
+        finance: 15,
+        alerts: 12,
+        chatMessages: 50,
+        healthDogs: 10,
+        breedingDogs: 10,
+        settingsUsers: 10,
+        settingsApprovals: 10
+    },
+    dailyReportsPageSize: 12,
+    dailyReportsVisibleCount: 12,
     _settingsDataLoaded: false,
     editingUserId: null,
 
@@ -143,24 +159,45 @@ const App = {
             container.innerHTML = '<div class="chat-empty"><i class="fas fa-comments"></i><p>No messages yet. Send the first one!</p></div>';
             return;
         }
-        this.chatMessages.forEach((msg) => {
+        const defaultCount = (this.listPageSizes && this.listPageSizes.chatMessages) || 50;
+        const visibleCount = this._getListVisibleCount('chatMessages', defaultCount);
+        const hiddenCount = Math.max(0, this.chatMessages.length - visibleCount);
+        const visibleMessages = hiddenCount > 0 ? this.chatMessages.slice(hiddenCount) : this.chatMessages.slice();
+        if (hiddenCount > 0) {
+            const banner = document.createElement('div');
+            banner.className = 'chat-history-controls';
+            banner.style.cssText = 'position:sticky;top:0;z-index:1;background:var(--surface);padding:8px 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+            banner.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="App.showMoreChatMessages()"><i class="fas fa-history"></i> Show older messages</button>' +
+                '<span style="font-size:0.82rem;color:var(--gray-500)">' + hiddenCount + ' older message' + (hiddenCount === 1 ? '' : 's') + ' hidden</span>';
+            container.appendChild(banner);
+        }
+        visibleMessages.forEach((msg) => {
             container.appendChild(this._buildChatBubble(msg, msg.userId === currentUserId));
         });
+        if (visibleCount > defaultCount) {
+            const fewerWrap = document.createElement('div');
+            fewerWrap.style.cssText = 'padding:10px 0 0';
+            fewerWrap.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="App.showFewerChatMessages()"><i class="fas fa-compress-alt"></i> Show fewer</button>';
+            container.appendChild(fewerWrap);
+        }
         container.scrollTop = container.scrollHeight;
     },
 
     _appendChatMessages(newMsgs) {
-        const container = document.getElementById('chatMessagesContainer');
-        if (!container) { this._renderChatMessages(); return; }
-        const empty = container.querySelector('.chat-empty');
-        if (empty) empty.remove();
-        const currentUser = KennelData.getCurrentUser();
-        const currentUserId = currentUser ? currentUser.id : '';
-        const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
-        newMsgs.forEach((msg) => {
-            container.appendChild(this._buildChatBubble(msg, msg.userId === currentUserId));
-        });
-        if (wasAtBottom) container.scrollTop = container.scrollHeight;
+        this._renderChatMessages();
+    },
+
+    showMoreChatMessages() {
+        const step = (this.listPageSizes && this.listPageSizes.chatMessages) || 50;
+        const current = this._getListVisibleCount('chatMessages', step);
+        this.listViewState.chatMessages = current + step;
+        this._renderChatMessages();
+    },
+
+    showFewerChatMessages() {
+        const base = (this.listPageSizes && this.listPageSizes.chatMessages) || 50;
+        this.listViewState.chatMessages = base;
+        this._renderChatMessages();
     },
 
     _buildChatBubble(msg, isMine) {
@@ -1825,6 +1862,44 @@ const App = {
         });
     },
 
+    showMoreDailyReports() {
+        const pageSize = this.dailyReportsPageSize > 0 ? this.dailyReportsPageSize : 12;
+        this.dailyReportsVisibleCount += pageSize;
+        this.render();
+    },
+
+    showFewerDailyReports() {
+        const pageSize = this.dailyReportsPageSize > 0 ? this.dailyReportsPageSize : 12;
+        this.dailyReportsVisibleCount = pageSize;
+        this.render();
+    },
+
+    _getListVisibleCount(key, fallback) {
+        if (!key) {
+            return fallback || this.listPageSizes.default || 12;
+        }
+        if (!Object.prototype.hasOwnProperty.call(this.listViewState, key)) {
+            const defaultCount = fallback || this.listPageSizes[key] || this.listPageSizes.default || 12;
+            this.listViewState[key] = defaultCount;
+        }
+        return this.listViewState[key];
+    },
+
+    showMoreList(key) {
+        if (!key) return;
+        const step = this.listPageSizes[key] || this.listPageSizes.default || 12;
+        const current = this._getListVisibleCount(key, step);
+        this.listViewState[key] = current + step;
+        this.render();
+    },
+
+    showFewerList(key) {
+        if (!key) return;
+        const base = this.listPageSizes[key] || this.listPageSizes.default || 12;
+        this.listViewState[key] = base;
+        this.render();
+    },
+
     // ===== Toggle For Sale =====
     toggleForSale(dogId) {
         const dog = KennelData.toggleForSale(dogId);
@@ -2608,19 +2683,16 @@ const App = {
     // Updates only the dog-grid contents (not the whole page), so the search input
     // never loses focus/cursor position and typing doesn't feel laggy on large lists.
     _applyDogFilters(genderFilter, searchQuery, saleFilter) {
-        const results = Components._buildDogResults(genderFilter, searchQuery, saleFilter);
-        const grid = document.querySelector('#pageMyDogs .dog-grid');
-        if (grid) grid.innerHTML = results.dogCardsHtml;
-        const countBadge = document.querySelector('#pageMyDogs .dog-count-badge');
-        if (countBadge) countBadge.textContent = '(' + results.dogs.length + ')';
-        const pageEl = document.getElementById('pageMyDogs');
-        let emptyEl = pageEl ? pageEl.querySelector('.dog-empty-state') : null;
-        if (results.dogs.length === 0) {
-            if (!emptyEl && pageEl) {
-                pageEl.insertAdjacentHTML('beforeend', results.emptyHtml);
-            }
-        } else if (emptyEl) {
-            emptyEl.remove();
+        this.currentDogViewFilters.gender = genderFilter || '';
+        this.currentDogViewFilters.search = searchQuery || '';
+        this.currentDogViewFilters.sale = saleFilter || '';
+        this.listViewState.myDogsActive = (this.listPageSizes && this.listPageSizes.myDogsActive) || 12;
+        this.render();
+        const searchInput = document.getElementById('dogSearch');
+        if (searchInput) {
+            searchInput.focus();
+            const cursorPos = this.currentDogViewFilters.search.length;
+            searchInput.setSelectionRange(cursorPos, cursorPos);
         }
     },
 

@@ -9,6 +9,22 @@ const Components = {
             .replace(/'/g, '&#39;');
     },
 
+    listControls(totalCount, shownCount, key, label) {
+        var controls = '';
+        if (totalCount > shownCount) {
+            var remaining = totalCount - shownCount;
+            controls += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+                '<button type="button" class="btn btn-secondary btn-sm" onclick="App.showMoreList(\'' + key + '\')"><i class="fas fa-plus"></i> Show more</button>' +
+                '<span style="color:var(--gray-500);font-size:0.88rem">' + remaining + ' more ' + label + (remaining === 1 ? '' : 's') + '</span>' +
+                '</div>';
+        }
+        var defaultCount = (typeof App !== 'undefined' && App.listPageSizes && App.listPageSizes[key]) ? App.listPageSizes[key] : 12;
+        if (shownCount > defaultCount) {
+            controls += '<div style="margin-top:8px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.showFewerList(\'' + key + '\')"><i class="fas fa-compress-alt"></i> Show fewer</button></div>';
+        }
+        return controls;
+    },
+
     formatDateYMD(date) {
         var y = date.getFullYear();
         var m = String(date.getMonth() + 1).padStart(2, '0');
@@ -242,16 +258,22 @@ const Components = {
             var bDate = b.nextDue ? new Date(b.nextDue) : (b.date ? new Date(b.date) : (b.startDate ? new Date(b.startDate) : new Date(0)));
             return bDate - aDate;
         });
+        var listKey = 'dogRecord_' + dogId + '_' + recordType;
+        var visibleCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount(listKey, 12)
+            : 12;
+        var visibleRecords = sortedRecords.slice(0, visibleCount);
         var items = '';
-        for (var i = 0; i < sortedRecords.length; i++) {
-            items += this.recordItem(dogId, recordType, sortedRecords[i]);
+        for (var i = 0; i < visibleRecords.length; i++) {
+            items += this.recordItem(dogId, recordType, visibleRecords[i]);
         }
         return '<div style="margin-bottom:12px">' +
             (KennelData.getCurrentUserRole() !== 'reviewer'
                 ? '<button class="btn btn-primary btn-sm" onclick="App.addRecord(\'' + dogId + '\',\'' + recordType + '\')"><i class="fas fa-plus"></i> Add ' + label + '</button>'
                 : '') +
             '</div>' +
-            '<div class="records-list-scroll"><div class="records-list">' + items + '</div></div>';
+            '<div class="records-list-scroll"><div class="records-list">' + items + '</div></div>' +
+            this.listControls(sortedRecords.length, visibleRecords.length, listKey, 'record');
     },
 
     dailyHealthStatusList: function(dog) {
@@ -289,25 +311,38 @@ const Components = {
         }
 
         var items = '';
+        var timelineEntries = [];
         for (var i = 0; i < entries.length; i++) {
             var entry = entries[i];
             if (current.entry && entry.reportId === current.entry.reportId && entry.healthStatus === current.entry.healthStatus) {
                 continue;
             }
-            var dateText = entry.reportDate ? new Date(entry.reportDate).toLocaleDateString() : 'Date unknown';
+            timelineEntries.push(entry);
+        }
+
+        var timelineKey = 'dogHealthTimeline_' + dog.id;
+        var visibleTimelineCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount(timelineKey, 12)
+            : 12;
+        var visibleTimelineEntries = timelineEntries.slice(0, visibleTimelineCount);
+
+        for (var j = 0; j < visibleTimelineEntries.length; j++) {
+            var timelineEntry = visibleTimelineEntries[j];
+            var dateText = timelineEntry.reportDate ? new Date(timelineEntry.reportDate).toLocaleDateString() : 'Date unknown';
             var meta = [];
-            if (entry.groomingStatus) meta.push('Grooming: ' + entry.groomingStatus);
-            if (entry.medication) meta.push('Medication: ' + entry.medication);
-            if (entry.personInCharge) meta.push('By: ' + entry.personInCharge);
+            if (timelineEntry.groomingStatus) meta.push('Grooming: ' + timelineEntry.groomingStatus);
+            if (timelineEntry.medication) meta.push('Medication: ' + timelineEntry.medication);
+            if (timelineEntry.personInCharge) meta.push('By: ' + timelineEntry.personInCharge);
             items += '<div class="record-item health">' +
                 '<div class="record-info">' +
-                '<h4>' + safe(entry.healthStatus || 'Status not set') + '</h4>' +
+                '<h4>' + safe(timelineEntry.healthStatus || 'Status not set') + '</h4>' +
                 '<p>' + safe(dateText + (meta.length ? ' • ' + meta.join(' • ') : '')) + '</p>' +
                 '</div>' +
                 '</div>';
         }
 
-        return addButton + pinnedHtml + '<div class="records-list">' + items + '</div>';
+        return addButton + pinnedHtml + '<div class="records-list">' + items + '</div>' +
+            this.listControls(timelineEntries.length, visibleTimelineEntries.length, timelineKey, 'entry');
     },
 
     dogDetailPanel: function(dog) {
@@ -938,16 +973,28 @@ const Components = {
 
         var results = this._buildDogResults(filterGender, searchQuery, saleFilter);
         var dogs = results.dogs;
-        var dogCardsHtml = results.dogCardsHtml;
+        var visibleDogCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('myDogsActive', (App.listPageSizes && App.listPageSizes.myDogsActive) || 12)
+            : 12;
+        var visibleDogs = dogs.slice(0, visibleDogCount);
+        var dogCardsHtml = '';
+        for (var i = 0; i < visibleDogs.length; i++) {
+            dogCardsHtml += this.dogCard(visibleDogs[i]);
+        }
+        var activeControlsHtml = this.listControls(dogs.length, visibleDogs.length, 'myDogsActive', 'dog');
         var emptyHtml = results.emptyHtml;
         var archivedDogs = KennelData.getArchivedDogs().sort(function(a, b) {
             return a.name.localeCompare(b.name);
         });
         var archivedSectionHtml = '';
         if (archivedDogs.length > 0) {
+            var visibleArchivedCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+                ? App._getListVisibleCount('myDogsArchived', (App.listPageSizes && App.listPageSizes.myDogsArchived) || 12)
+                : 12;
+            var visibleArchivedDogs = archivedDogs.slice(0, visibleArchivedCount);
             var archivedCardsHtml = '';
-            for (var i = 0; i < archivedDogs.length; i++) {
-                archivedCardsHtml += this.dogCard(archivedDogs[i]);
+            for (var j = 0; j < visibleArchivedDogs.length; j++) {
+                archivedCardsHtml += this.dogCard(visibleArchivedDogs[j]);
             }
             archivedSectionHtml =
                 '<div class="section-header" style="margin-top:24px">' +
@@ -955,7 +1002,8 @@ const Components = {
                 '<div class="section-badge"><i class="fas fa-moon"></i> Sold &amp; deceased</div>' +
                 '</div>' +
                 '<p style="margin:0 0 10px;color:var(--gray-500);font-size:0.92rem">These dogs are removed from operational pages and selectors. Their profiles remain for history.</p>' +
-                '<div class="dog-grid">' + archivedCardsHtml + '</div>';
+                '<div class="dog-grid">' + archivedCardsHtml + '</div>' +
+                this.listControls(archivedDogs.length, visibleArchivedDogs.length, 'myDogsArchived', 'archived profile');
         }
 
         return '<div class="page-shell" id="pageMyDogs">' +
@@ -986,6 +1034,7 @@ const Components = {
             '<option value="sale"' + (saleFilter === 'sale' ? ' selected' : '') + '>For Sale</option>' +
             '</select></div>' +
             '<div class="dog-grid">' + dogCardsHtml + '</div>' +
+                activeControlsHtml +
             emptyHtml +
             archivedSectionHtml +
             '</div>';
@@ -1075,7 +1124,12 @@ const Components = {
 
         // Show the dog with the most recently updated health record first.
         dogCards.sort(function(a, b) { return b.latestTimestamp - a.latestTimestamp; });
-        var cardsHtml = dogCards.map(function(item) { return item.html; }).join('');
+        var visibleHealthCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('healthDogs', (App.listPageSizes && App.listPageSizes.healthDogs) || 10)
+            : 10;
+        var visibleHealthCards = dogCards.slice(0, visibleHealthCount);
+        var cardsHtml = visibleHealthCards.map(function(item) { return item.html; }).join('');
+        var healthControlsHtml = this.listControls(dogCards.length, visibleHealthCards.length, 'healthDogs', 'dog');
 
         if (!cardsHtml) {
             cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-heartbeat" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No active dogs found</p></div>';
@@ -1090,12 +1144,14 @@ const Components = {
                 ? '<button class="btn btn-primary btn-sm" onclick="App.showLogHealthStatusModal()"><i class="fas fa-stethoscope"></i> Log health status</button>'
                 : '') +
             '</div></div>' +
-            '<div class="content-grid">' + cardsHtml + '</div></div>';
+            '<div class="content-grid">' + cardsHtml + '</div>' +
+            healthControlsHtml +
+            '</div>';
     },
 
     breedingPage: function() {
         var dogs = KennelData.getOperationalDogs().filter(function(dog) { return dog.gender === 'Female'; });
-        var cardsHtml = '';
+        var cards = [];
 
         for (var i = 0; i < dogs.length; i++) {
             var dog = dogs[i];
@@ -1116,8 +1172,15 @@ const Components = {
                 }
             }
 
-            cardsHtml += '<div class="card section-card clickable-card" onclick="App.openDogBreedingRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s breeding records in profile"><div class="card-header"><h3><i class="fas fa-dna"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>';
+            cards.push('<div class="card section-card clickable-card" onclick="App.openDogBreedingRecords(\'' + dog.id + '\')" title="View ' + this.escapeHtml(dog.name) + '\'s breeding records in profile"><div class="card-header"><h3><i class="fas fa-dna"></i> ' + dog.name + '</h3><i class="fas fa-chevron-right" style="color:var(--gray-400)"></i></div><div class="card-body">' + recordsHtml + '</div></div>');
         }
+
+        var visibleBreedingCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('breedingDogs', (App.listPageSizes && App.listPageSizes.breedingDogs) || 10)
+            : 10;
+        var visibleBreedingCards = cards.slice(0, visibleBreedingCount);
+        var cardsHtml = visibleBreedingCards.join('');
+        var breedingControlsHtml = this.listControls(cards.length, visibleBreedingCards.length, 'breedingDogs', 'dog');
 
         if (!cardsHtml) {
             cardsHtml = '<div class="dog-empty-state" style="text-align:center;padding:60px 20px;color:var(--gray-400)"><i class="fas fa-dna" style="font-size:2rem;margin-bottom:12px;display:block"></i><p style="font-size:1.1rem">No female dogs found</p></div>';
@@ -1128,13 +1191,19 @@ const Components = {
             '<div><div class="hero-badge"><i class="fas fa-dna"></i> Breeding program</div><h2>Track matings, litters, and breeding history</h2><p>Keep breeding records organized for every dog in your kennel.</p></div>' +
             '</section>' +
             '<div class="section-header"><h2><i class="fas fa-dna"></i> Breeding</h2><div class="section-badge"><i class="fas fa-seedling"></i> Family planning</div></div>' +
-            '<div class="content-grid">' + cardsHtml + '</div></div>';
+                '<div class="content-grid">' + cardsHtml + '</div>' +
+                breedingControlsHtml +
+                '</div>';
     },
 
     dailyReportPage: function() {
         var reports = KennelData.getDailyReports();
         var dogs = KennelData.getOperationalDogs();
         var puppies = KennelData.getPuppies();
+        var defaultVisibleReports = 12;
+        var visibleCount = (typeof App !== 'undefined' && typeof App.dailyReportsVisibleCount === 'number' && App.dailyReportsVisibleCount > 0)
+            ? App.dailyReportsVisibleCount
+            : defaultVisibleReports;
         var dogOptionsHtml = '';
         var puppyOptionsHtml = '';
         dogs.forEach(function(dog) {
@@ -1161,8 +1230,9 @@ const Components = {
             summary = '<div class="detail-info-grid"><div class="detail-info-item"><label>Latest report</label><p>' + new Date(reports[0].date).toLocaleDateString() + '</p></div><div class="detail-info-item"><label>Reports logged</label><p>' + reports.length + '</p></div><div class="detail-info-item"><label>Most recent staff</label><p>' + (reports[0].personInCharge || 'N/A') + '</p></div></div>';
             var todayStr = this.formatDateYMD(new Date());
             var tilesHtml = '';
-            for (var i = 0; i < reports.length; i++) {
-                var report = reports[i];
+            var visibleReports = reports.slice(0, visibleCount);
+            for (var i = 0; i < visibleReports.length; i++) {
+                var report = visibleReports[i];
                 var isToday = report.date === todayStr;
                 var formattedDate = report.date ? new Date(report.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown date';
                 var tileTitle = isToday ? "Today's Report" : (formattedDate + ' Report');
@@ -1174,6 +1244,16 @@ const Components = {
                     '</button>';
             }
             reportCardsHtml = '<div class="daily-report-tile-grid">' + tilesHtml + '</div>';
+            if (reports.length > visibleReports.length) {
+                var remaining = reports.length - visibleReports.length;
+                reportCardsHtml += '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+                    '<button type="button" class="btn btn-secondary btn-sm" onclick="App.showMoreDailyReports()"><i class="fas fa-plus"></i> Show more reports</button>' +
+                    '<span style="color:var(--gray-500);font-size:0.88rem">' + remaining + ' older report' + (remaining === 1 ? '' : 's') + ' hidden</span>' +
+                    '</div>';
+            }
+            if (visibleReports.length > defaultVisibleReports) {
+                reportCardsHtml += '<div style="margin-top:8px"><button type="button" class="btn btn-secondary btn-sm" onclick="App.showFewerDailyReports()"><i class="fas fa-compress-alt"></i> Show fewer</button></div>';
+            }
         }
 
         return '<div class="page-shell" id="pageDailyReport">' +
@@ -1373,6 +1453,14 @@ const Components = {
         var summaryCards = '';
         var users = KennelData.getUsers();
         var pendingApprovals = KennelData.getPendingApprovals();
+        var visibleUsersCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('settingsUsers', (App.listPageSizes && App.listPageSizes.settingsUsers) || 10)
+            : 10;
+        var visiblePendingApprovalsCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('settingsApprovals', (App.listPageSizes && App.listPageSizes.settingsApprovals) || 10)
+            : 10;
+        var visibleUsers = users.slice(0, visibleUsersCount);
+        var visiblePendingApprovals = pendingApprovals.slice(0, visiblePendingApprovalsCount);
         var userRows = '';
         var pendingRows = '';
 
@@ -1380,12 +1468,14 @@ const Components = {
 
         var maxUsers = KennelData.getMaxUsers();
         var userCount = users.length;
+        var userControlsHtml = '';
+        var pendingControlsHtml = '';
 
         if (!users.length) {
             userRows = '<p style="color:var(--gray-400)">No users yet.</p>';
         } else {
-            for (var i = 0; i < users.length; i++) {
-                var item = users[i];
+            for (var i = 0; i < visibleUsers.length; i++) {
+                var item = visibleUsers[i];
                 var safe = this.escapeHtml.bind(this);
                 var isCurrentUser = KennelData.getCurrentUser() && KennelData.getCurrentUser().id === item.id;
                 if (editingUserId === item.id) {
@@ -1430,6 +1520,7 @@ const Components = {
                         '</div></div></div>';
                 }
             }
+            userControlsHtml = this.listControls(users.length, visibleUsers.length, 'settingsUsers', 'user account');
         }
 
         summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-dog"></i> Kennel overview</h3></div><div class="card-body"><div class="detail-info-grid">' +
@@ -1467,8 +1558,8 @@ const Components = {
         if (!pendingApprovals.length) {
             pendingRows = '<p style="color:var(--gray-400)">No items need review right now.</p>';
         } else {
-            for (var j = 0; j < pendingApprovals.length; j++) {
-                var approval = pendingApprovals[j];
+            for (var j = 0; j < visiblePendingApprovals.length; j++) {
+                var approval = visiblePendingApprovals[j];
                 var label = approval.entityType || 'item';
                 var payload = approval.payload || {};
                 var payloadData = payload.data || payload;
@@ -1482,12 +1573,13 @@ const Components = {
                     '<button class="btn btn-sm btn-secondary" onclick="App.rejectPendingApproval(\'' + approval.id + '\')">Reject</button>' +
                     '</div></div></div>';
             }
+                    pendingControlsHtml = this.listControls(pendingApprovals.length, visiblePendingApprovals.length, 'settingsApprovals', 'pending item');
         }
 
         var pendingBadgeHtml = pendingApprovals.length > 0
             ? '<span class="status-pill pulse-attention">' + pendingApprovals.length + ' pending</span>'
             : '';
-        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3>' + pendingBadgeHtml + '</div><div class="card-body">' + pendingRows + '</div></div>';
+        summaryCards += '<div class="card section-card"><div class="card-header"><h3><i class="fas fa-clipboard-check"></i> Approval queue</h3>' + pendingBadgeHtml + '</div><div class="card-body">' + pendingRows + pendingControlsHtml + '</div></div>';
 
         summaryCards += '<div class="card section-card"><div class="card-header" style="flex-wrap:wrap;gap:8px"><h3><i class="fas fa-users"></i> User management</h3><span style="font-size:0.82rem;color:var(--gray-500)">' + userCount + ' / ' + maxUsers + ' accounts</span></div><div class="card-body">' +
             (role !== 'reviewer'
@@ -1504,7 +1596,7 @@ const Components = {
                   '<button class="btn btn-primary" type="submit"><i class="fas fa-user-plus"></i> Create user</button>' +
                   '</form>'
                 : '<p style="color:var(--gray-400);font-size:0.9rem;margin-bottom:12px"><i class="fas fa-lock"></i> Reviewers can view users but cannot create or modify accounts.</p>') +
-            '<div style="margin-top:16px"><h4 style="margin-bottom:8px">Existing users</h4>' + userRows + '</div></div></div>';
+            '<div style="margin-top:16px"><h4 style="margin-bottom:8px">Existing users</h4>' + userRows + userControlsHtml + '</div></div></div>';
 
         return '<div class="page-shell" id="pageSettings">' +
             '<section class="page-hero">' +
@@ -1517,6 +1609,10 @@ const Components = {
     puppiesPage: function() {
         var puppies = KennelData.getPuppies();
         var reports = KennelData.getDailyReports();
+        var visiblePuppiesCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('puppies', (App.listPageSizes && App.listPageSizes.puppies) || 10)
+            : 10;
+        var visiblePuppies = puppies.slice(0, visiblePuppiesCount);
         var latestPuppyHealthById = {};
         for (var reportIndex = 0; reportIndex < reports.length; reportIndex++) {
             var puppyStatuses = reports[reportIndex].puppyStatuses || [];
@@ -1535,8 +1631,8 @@ const Components = {
         if (puppies.length === 0) {
             puppyCardsHtml = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400)"><i class="fas fa-paw" style="font-size:2.5rem;margin-bottom:12px;display:block"></i><p>No puppies recorded yet.</p></div>';
         } else {
-            for (var i = 0; i < puppies.length; i++) {
-                var puppy = puppies[i];
+            for (var i = 0; i < visiblePuppies.length; i++) {
+                var puppy = visiblePuppies[i];
                 var vaccinationText = (puppy.vaccinations && puppy.vaccinations.length > 0 && puppy.vaccinations[0].date) ? puppy.vaccinations[0].date : 'Not recorded';
                 var nextVaccinationText = (puppy.vaccinations && puppy.vaccinations.length > 0 && puppy.vaccinations[0].nextDue) ? puppy.vaccinations[0].nextDue : 'Not scheduled';
                 var dewormingText = (puppy.deworming && puppy.deworming.length > 0 && puppy.deworming[0].date) ? puppy.deworming[0].date : 'Not recorded';
@@ -1610,6 +1706,7 @@ const Components = {
                     '</div></div></div>';
             }
         }
+        var puppiesControlsHtml = this.listControls(puppies.length, visiblePuppies.length, 'puppies', 'puppy');
 
         return '<div class="page-shell" id="pagePuppies">' +
             '<section class="page-hero">' +
@@ -1672,7 +1769,9 @@ const Components = {
                   '</form></div>') +
             '</div>' +
             '<div class="section-header"><h2><i class="fas fa-list"></i> Puppy Records</h2></div>' +
-            '<div class="content-grid">' + puppyCardsHtml + '</div></div>';
+                '<div class="content-grid">' + puppyCardsHtml + '</div>' +
+                puppiesControlsHtml +
+                '</div>';
     },
 
     financePage: function(options) {
@@ -1685,11 +1784,16 @@ const Components = {
         var summary = KennelData.getFinanceSummary();
         var rowsHtml = '';
 
+        var visibleEntriesCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('finance', (App.listPageSizes && App.listPageSizes.finance) || 15)
+            : 15;
+        var visibleEntries = entries.slice(0, visibleEntriesCount);
+
         if (entries.length === 0) {
             rowsHtml = '<div style="text-align:center;padding:32px 12px;color:var(--gray-400)"><i class="fas fa-chart-line" style="font-size:2rem;margin-bottom:10px;display:block"></i><p>No finance activity recorded yet.</p></div>';
         } else {
-            for (var i = 0; i < entries.length; i++) {
-                var entry = entries[i];
+            for (var i = 0; i < visibleEntries.length; i++) {
+                var entry = visibleEntries[i];
                 var amountClass = entry.type === 'sale' ? 'finance-amount sale' : 'finance-amount expense';
                 var sign = entry.type === 'sale' ? '+' : '-';
                 rowsHtml += '<div class="finance-list-item">' +
@@ -1703,6 +1807,7 @@ const Components = {
                     (KennelData.getCurrentUserRole() !== 'reviewer' ? '<button class="btn btn-sm btn-secondary" onclick="App.deleteFinanceEntry(\'' + entry.id + '\')"><i class="fas fa-trash"></i></button>' : '') +
                     '</div></div>';
             }
+                    rowsHtml += this.listControls(entries.length, visibleEntries.length, 'finance', 'transaction');
         }
 
         var maxBarHeight = 1;
@@ -1844,6 +1949,10 @@ const Components = {
 
     alertsPage: function() {
         var alerts = KennelData.getAlerts();
+        var visibleAlertsCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+            ? App._getListVisibleCount('alerts', (App.listPageSizes && App.listPageSizes.alerts) || 12)
+            : 12;
+        var visibleAlerts = alerts.slice(0, visibleAlertsCount);
         var contentHtml;
 
         if (alerts.length === 0) {
@@ -1852,8 +1961,8 @@ const Components = {
                 '<p style="font-size:1.1rem">All caught up! No pending alerts.</p></div>';
         } else {
             var itemsHtml = '';
-            for (var i = 0; i < alerts.length; i++) {
-                var a = alerts[i];
+            for (var i = 0; i < visibleAlerts.length; i++) {
+                var a = visibleAlerts[i];
                 var icon = a.severity === 'danger' ? 'fa-exclamation-circle' : 'fa-exclamation-triangle';
                 itemsHtml += '<div class="alert-item ' + a.severity + '">' +
                     '<div class="alert-icon ' + a.severity + '"><i class="fas ' + icon + '"></i></div>' +
@@ -1871,7 +1980,7 @@ const Components = {
                     '</div>' +
                     '</div>';
             }
-            contentHtml = '<div class="alerts-list">' + itemsHtml + '</div>';
+                    contentHtml = '<div class="alerts-list">' + itemsHtml + '</div>' + this.listControls(alerts.length, visibleAlerts.length, 'alerts', 'alert');
         }
 
         return '<div class="page-shell" id="pageAlerts">' +
