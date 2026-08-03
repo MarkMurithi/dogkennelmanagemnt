@@ -1205,19 +1205,28 @@ const Components = {
                 if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
                 return new Date(b.date || 0) - new Date(a.date || 0);
             });
+            var visibleEntryCount = (typeof App !== 'undefined' && typeof App._getListVisibleCount === 'function')
+                ? App._getListVisibleCount('puppyHealthEntries_' + puppy.id, (App.listPageSizes && App.listPageSizes.puppyHealthEntries) || 3)
+                : 3;
+            var visibleEntries = entries.slice(0, visibleEntryCount);
             if (entries.length === 0) {
                 recordsHtml = '<p style="color:var(--gray-400)">No puppy health records yet.</p>';
             } else {
-                for (var m = 0; m < entries.length; m++) {
-                    var entry = entries[m];
+                for (var m = 0; m < visibleEntries.length; m++) {
+                    var entry = visibleEntries[m];
                     var entryClass = 'alert-item' + (entry.alert ? ' health-alert-pinned' : '');
                     var alertBadge = entry.alert ? ' <span class="health-alert-badge"><i class="fas fa-exclamation-triangle"></i> Needs watch</span>' : '';
-                    recordsHtml += '<div class="' + entryClass + '" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
+                    recordsHtml += '<div class="' + entryClass + ' puppy-health-entry" style="padding:14px 0;border-bottom:1px solid var(--gray-100)">' +
                         '<div class="alert-content">' +
                         '<h4>' + entry.title + alertBadge + '</h4>' +
                         '<p>' + entry.details + '</p>' +
                         '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
                         '</div></div>';
+                }
+                if (entries.length > visibleEntries.length) {
+                    recordsHtml += '<div style="margin-top:10px;display:flex;justify-content:flex-start"><button type="button" class="btn btn-secondary btn-sm puppy-health-accordion-toggle" onclick="App.togglePuppyHealthEntries(\'' + puppy.id + '\', ' + entries.length + ')"><i class="fas fa-chevron-down"></i> View all ' + entries.length + ' entries</button></div>';
+                } else if (entries.length > 3) {
+                    recordsHtml += '<div style="margin-top:10px;display:flex;justify-content:flex-start"><button type="button" class="btn btn-secondary btn-sm puppy-health-accordion-toggle" onclick="App.togglePuppyHealthEntries(\'' + puppy.id + '\', ' + entries.length + ')"><i class="fas fa-chevron-up"></i> Show fewer</button></div>';
                 }
             }
 

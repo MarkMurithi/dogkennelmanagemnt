@@ -33,6 +33,7 @@ const App = {
         alerts: 12,
         chatMessages: 50,
         healthDogs: 10,
+        puppyHealthEntries: 3,
         breedingDogs: 10,
         settingsUsers: 10,
         settingsApprovals: 10
@@ -1942,6 +1943,15 @@ const App = {
         if (isDogDetailList && this._refreshOpenDogDetailPanel()) {
             return;
         }
+        this.render();
+    },
+
+    togglePuppyHealthEntries(puppyId, totalCount) {
+        if (!puppyId || !totalCount) return;
+        const key = 'puppyHealthEntries_' + puppyId;
+        const defaultCount = this.listPageSizes.puppyHealthEntries || 3;
+        const current = this._getListVisibleCount(key, defaultCount);
+        this.listViewState[key] = current >= totalCount ? defaultCount : totalCount;
         this.render();
     },
 

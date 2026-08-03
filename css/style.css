@@ -1663,6 +1663,36 @@ body.modal-open {
 
 .alert-time { font-size: 0.75rem; color: var(--gray-400); white-space: nowrap; }
 
+.puppy-health-accordion-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(200, 169, 81, 0.25);
+    background: rgba(248, 244, 232, 0.9);
+    color: var(--primary-dark);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.puppy-health-accordion-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(23, 19, 13, 0.08);
+    background: rgba(240, 233, 214, 0.95);
+}
+
+.puppy-health-entry {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.puppy-health-entry.is-hidden {
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+}
+
 /* ===== Loading Skeleton ===== */
 .skeleton {
     background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
