@@ -416,7 +416,9 @@ const App = {
             const form = document.getElementById('dailyReportForm');
             const saveBtn = document.getElementById('dailyReportSave');
             const addDogStatusBtn = document.getElementById('dailyReportAddDogStatus');
+            let fillAllDogsBtn = document.getElementById('dailyReportFillAllGoodClean');
             const addPuppyStatusBtn = document.getElementById('dailyReportAddPuppyStatus');
+            let fillAllPuppiesBtn = document.getElementById('dailyReportFillAllPuppiesHealthy');
             const statusList = document.getElementById('dailyReportStatusList');
             const puppyStatusList = document.getElementById('dailyReportPuppyStatusList');
             const dogSelect = document.getElementById('dailyReportDogSelect');
@@ -454,6 +456,22 @@ const App = {
             const puppyHealth = document.getElementById('dailyReportPuppyHealth');
             let dogStatuses = [];
             let puppyStatuses = [];
+
+            if (!fillAllDogsBtn && addDogStatusBtn) {
+                addDogStatusBtn.insertAdjacentHTML(
+                    'afterend',
+                    '<button type="button" class="btn btn-secondary btn-sm" id="dailyReportFillAllGoodClean" style="margin-left:8px"><i class="fas fa-check-double"></i> Mark all dogs good & clean</button>'
+                );
+                fillAllDogsBtn = document.getElementById('dailyReportFillAllGoodClean');
+            }
+
+            if (!fillAllPuppiesBtn && addPuppyStatusBtn) {
+                addPuppyStatusBtn.insertAdjacentHTML(
+                    'afterend',
+                    '<button type="button" class="btn btn-secondary btn-sm" id="dailyReportFillAllPuppiesHealthy" style="margin-left:8px"><i class="fas fa-baby"></i> Mark all puppies healthy</button>'
+                );
+                fillAllPuppiesBtn = document.getElementById('dailyReportFillAllPuppiesHealthy');
+            }
 
             if (dogSelect && this.pendingDailyReportDogId) {
                 dogSelect.value = this.pendingDailyReportDogId;
@@ -534,6 +552,32 @@ const App = {
                 });
             }
 
+            if (fillAllDogsBtn) {
+                fillAllDogsBtn.addEventListener('click', () => {
+                    if (!dogSelect) {
+                        Components.toast('Dog selector is unavailable right now.', 'error');
+                        return;
+                    }
+                    const dogOptions = Array.from(dogSelect.options || []).filter((option) => option.value);
+                    if (dogOptions.length === 0) {
+                        Components.toast('No dogs available to mark right now.', 'error');
+                        return;
+                    }
+                    dogStatuses = dogOptions.map((option) => ({
+                        dogId: option.value,
+                        dogName: option.text,
+                        healthStatus: 'Good',
+                        groomingStatus: 'Clean',
+                        medication: ''
+                    }));
+                    if (dogHealth) dogHealth.value = 'Good';
+                    if (dogGrooming) dogGrooming.value = 'Clean';
+                    if (dogMedication) dogMedication.value = '';
+                    renderStatusList();
+                    Components.toast('Marked ' + dogOptions.length + ' dogs as good and clean.');
+                });
+            }
+
             if (addPuppyStatusBtn) {
                 addPuppyStatusBtn.addEventListener('click', () => {
                     if (!puppySelect || !puppySelect.value) {
@@ -552,6 +596,31 @@ const App = {
                     puppyHealth.value = '';
                     if (puppyMedEl) puppyMedEl.value = '';
                     renderPuppyStatusList();
+                });
+            }
+
+            if (fillAllPuppiesBtn) {
+                fillAllPuppiesBtn.addEventListener('click', () => {
+                    if (!puppySelect) {
+                        Components.toast('Puppy selector is unavailable right now.', 'error');
+                        return;
+                    }
+                    const puppyOptions = Array.from(puppySelect.options || []).filter((option) => option.value);
+                    if (puppyOptions.length === 0) {
+                        Components.toast('No puppies available to mark right now.', 'error');
+                        return;
+                    }
+                    puppyStatuses = puppyOptions.map((option) => ({
+                        puppyId: option.value,
+                        puppyName: option.text,
+                        healthStatus: 'Healthy',
+                        medication: ''
+                    }));
+                    if (puppyHealth) puppyHealth.value = 'Healthy';
+                    const puppyMedEl = document.getElementById('dailyReportPuppyMedication');
+                    if (puppyMedEl) puppyMedEl.value = '';
+                    renderPuppyStatusList();
+                    Components.toast('Marked ' + puppyOptions.length + ' puppies as healthy.');
                 });
             }
 
