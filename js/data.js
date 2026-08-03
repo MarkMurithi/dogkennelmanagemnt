@@ -470,6 +470,90 @@ const KennelData = {
         });
     },
 
+    _isClearedStatusEntry(entry) {
+        return !!(entry && entry.cleared);
+    },
+
+    clearDogHealthStatusEntry(dogId, referenceDate) {
+        var cleared = false;
+        var normalizedDate = referenceDate || '';
+
+        for (var i = 0; i < this._dailyReports.length; i++) {
+            var report = this._dailyReports[i] || {};
+            var statuses = Array.isArray(report.dogStatuses) ? report.dogStatuses : [];
+            for (var j = 0; j < statuses.length; j++) {
+                var status = statuses[j] || {};
+                var statusMatchesId = status.dogId && dogId && status.dogId === dogId;
+                var statusDate = status.reportDate || status.createdAt || '';
+                var datesMatch = !normalizedDate || !statusDate || statusDate === normalizedDate;
+                if (statusMatchesId && datesMatch && !this._isClearedStatusEntry(status)) {
+                    status.cleared = true;
+                    cleared = true;
+                }
+            }
+        }
+
+        if (!cleared) {
+            for (var q = 0; q < this._dogStatusUpdates.length; q++) {
+                var update = this._dogStatusUpdates[q] || {};
+                var updateMatchesId = update.dogId && dogId && update.dogId === dogId;
+                var updateDate = update.reportDate || update.createdAt || '';
+                var updateDatesMatch = !normalizedDate || !updateDate || updateDate === normalizedDate;
+                if (updateMatchesId && updateDatesMatch && !this._isClearedStatusEntry(update)) {
+                    update.cleared = true;
+                    cleared = true;
+                }
+            }
+        }
+
+        if (cleared) {
+            this._save();
+            this._notify();
+        }
+
+        return cleared;
+    },
+
+    clearPuppyHealthStatusEntry(puppyId, referenceDate) {
+        var cleared = false;
+        var normalizedDate = referenceDate || '';
+
+        for (var i = 0; i < this._dailyReports.length; i++) {
+            var report = this._dailyReports[i] || {};
+            var statuses = Array.isArray(report.puppyStatuses) ? report.puppyStatuses : [];
+            for (var j = 0; j < statuses.length; j++) {
+                var status = statuses[j] || {};
+                var statusMatchesId = status.puppyId && puppyId && status.puppyId === puppyId;
+                var statusDate = status.reportDate || status.createdAt || '';
+                var datesMatch = !normalizedDate || !statusDate || statusDate === normalizedDate;
+                if (statusMatchesId && datesMatch && !this._isClearedStatusEntry(status)) {
+                    status.cleared = true;
+                    cleared = true;
+                }
+            }
+        }
+
+        if (!cleared) {
+            for (var q = 0; q < this._puppyStatusUpdates.length; q++) {
+                var update = this._puppyStatusUpdates[q] || {};
+                var updateMatchesId = update.puppyId && puppyId && update.puppyId === puppyId;
+                var updateDate = update.reportDate || update.createdAt || '';
+                var updateDatesMatch = !normalizedDate || !updateDate || updateDate === normalizedDate;
+                if (updateMatchesId && updateDatesMatch && !this._isClearedStatusEntry(update)) {
+                    update.cleared = true;
+                    cleared = true;
+                }
+            }
+        }
+
+        if (cleared) {
+            this._save();
+            this._notify();
+        }
+
+        return cleared;
+    },
+
     getPuppyDailyHealthStatuses(puppyId, puppyName) {
         var reports = this.getDailyReports();
         var normalizedName = (puppyName || '').toLowerCase().trim();
@@ -521,6 +605,10 @@ const KennelData = {
                 notes: ''
             });
         }
+
+        entries = entries.filter(function(entry) {
+            return !this._isClearedStatusEntry(entry);
+        }.bind(this));
 
         entries.sort(function(a, b) {
             var aDate = new Date(a.reportDate || a.createdAt || 0);
@@ -584,6 +672,7 @@ const KennelData = {
             pendingApprovals: this._pendingApprovals,
             mySubmissions: this._mySubmissions,
             dogStatusUpdates: this._dogStatusUpdates,
+            puppyStatusUpdates: this._puppyStatusUpdates,
             currentUser: this._currentUser
         }));
     },
@@ -1769,6 +1858,14 @@ const KennelData = {
                 notes: ''
             });
         }
+
+        entries = entries.filter(function(entry) {
+            return !this._isClearedStatusEntry(entry);
+        }.bind(this));
+
+        entries = entries.filter(function(entry) {
+            return !this._isClearedStatusEntry(entry);
+        }.bind(this));
 
         entries.sort(function(a, b) {
             var aDate = new Date(a.reportDate || a.createdAt || 0);

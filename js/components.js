@@ -1118,6 +1118,7 @@ const Components = {
                         '<h4>' + entry.title + alertBadge + '</h4>' +
                         '<p>' + entry.details + '</p>' +
                         '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
+                        (entry.clearable ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px" onclick="App.clearDogHealthStatusEntry(\'' + dog.id + '\', \'' + entry.clearDate + '\')"><i class="fas fa-broom"></i> Clear</button>' : '') +
                         '</div></div>';
                 }
             }
@@ -1176,7 +1177,11 @@ const Components = {
                     title: 'Current health status',
                     details: curDetails.join(' • '),
                     pinned: true,
-                    alert: currentHealthStatus.needsWatch
+                    alert: currentHealthStatus.needsWatch,
+                    clearable: currentHealthStatus.needsWatch,
+                    clearDate: curStatus.reportDate || curStatus.createdAt || '',
+                    clearable: currentHealthStatus.needsWatch,
+                    clearDate: curStatus.reportDate || curStatus.createdAt || ''
                 });
             }
 
@@ -1221,6 +1226,7 @@ const Components = {
                         '<h4>' + entry.title + alertBadge + '</h4>' +
                         '<p>' + entry.details + '</p>' +
                         '<p style="font-size:0.8rem;color:var(--gray-400);margin-top:4px">' + (entry.date ? new Date(entry.date).toLocaleDateString() : 'Date pending') + '</p>' +
+                        (entry.clearable ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px" onclick="App.clearPuppyHealthStatusEntry(\'' + puppy.id + '\', \'' + entry.clearDate + '\')"><i class="fas fa-broom"></i> Clear</button>' : '') +
                         '</div></div>';
                 }
                 if (entries.length > visibleEntries.length) {

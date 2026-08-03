@@ -1873,6 +1873,22 @@ const App = {
         window.history.pushState({ page: this.currentPage, modal: 'puppyHealthStatusModal' }, '', window.location.pathname + window.location.search);
     },
 
+    clearDogHealthStatusEntry(dogId, referenceDate) {
+        if (!dogId) return;
+        if (KennelData.clearDogHealthStatusEntry(dogId, referenceDate)) {
+            Components.toast('Health alert cleared', 'success');
+            this.render();
+        }
+    },
+
+    clearPuppyHealthStatusEntry(puppyId, referenceDate) {
+        if (!puppyId) return;
+        if (KennelData.clearPuppyHealthStatusEntry(puppyId, referenceDate)) {
+            Components.toast('Health alert cleared', 'success');
+            this.render();
+        }
+    },
+
     setupDetailTabs() {
         document.querySelectorAll('.records-tab').forEach(tab => {
             tab.addEventListener('click', () => {
